@@ -302,7 +302,7 @@ class HackerNewsFineTuner:
     def build_interface(self) -> gr.Blocks:
         with gr.Blocks(title="Embedding Gemma Modkit") as demo:
             gr.Markdown("# 🤖 Embedding Gemma Modkit: Fine-Tuning and Mood Reader")
-            gr.Markdown("See [README](./README.md) for more details.")
+            gr.Markdown("See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
             with gr.Tab("🚀 Fine-Tuning & Evaluation"):
                 self._build_training_interface()
             with gr.Tab("💡 News Vibe Check"):
