@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="300">
+    <title>Hacker News Vibe Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            /* Use the imported pixel font */
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a1a1a; /* Dark background */
+            color: #00ff00; /* Classic green terminal text */
+            margin: 0;
+            padding: 1rem;
+            /* Prevents font anti-aliasing to keep it crisp */
+            -webkit-font-smoothing: none;
+            -moz-osx-font-smoothing: grayscale;
+            /* Ensures emojis are rendered as pixels */
+            image-rendering: pixelated;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 1rem auto;
+            border: 2px solid #00ff00;
+            padding: 1.5rem;
+            /* Hard, blocky shadow for a retro UI feel */
+            box-shadow: 5px 5px 0px #005f00;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            color: #ffffff;
+            text-shadow: 2px 2px #00ff00;
+            margin-top: 0;
+        }
+        
+        .meta-info {
+            font-size: 0.7rem;
+            color: #8cff8c;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #005f00;
+            padding-bottom: 1rem;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        li {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 1.5rem;
+        }
+        
+        .vibe {
+            flex-shrink: 0;
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .title a {
+            color: #ffffff; /* Brighter white for main links */
+            text-decoration: none;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        
+        .title a:hover {
+            background-color: #00ff00;
+            color: #1a1a1a;
+        }
+        
+        .details {
+            font-size: 0.7rem;
+            color: #8cff8c; /* Dimmer green for details */
+            margin-top: 0.5rem;
+        }
+        
+        .details a {
+            color: #00ff00;
+            text-decoration: underline;
+        }
+        
+        .details a:hover {
+            color: #ffffff;
+            background-color: transparent;
+        }
+
+        /* Make sure code tags also use the pixel font */
+        code {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #005f00;
+            padding: 2px 4px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>[ Hacker News Vibe Reader ]</h1>
+        <div class="meta-info">
+            MODEL: <code>{{ model_name }}</code> <br>
+            UPDATED: {{ last_updated }}
+        </div>
+        <ul>
+            {% for item in entries %}
+            <li>
+                <div class="vibe">{{ item.mood.status_html | safe }}</div>
+                <div>
+                    <div class="title"><a href="{{ item.link }}" target="_blank">{{ item.title }}</a></div>
+                    <div class="details">
+                        {{ item.published_time_str }} | <a href="{{ item.comments_link }}" target="_blank">COMMENTS</a>
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
