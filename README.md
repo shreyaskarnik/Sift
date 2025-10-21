@@ -95,6 +95,8 @@ Navigate to the local URL provided (e.g., `http://127.0.0.1:7860`).
 
 This app runs directly in your terminal, allowing you to quickly see and scroll through the scored Hacker News feed.
 
+![image](cli.png)
+
 **▶️ To run:**
 
 ```bash
@@ -120,6 +122,8 @@ python cli_mood_reader.py --top 10
 ### Option C: Standalone Web Viewer (Flask App)
 
 This app is a simple, read-only web page that fetches and displays the scored HN feed. It's ideal for deploying a finished model.
+
+![image](flask.png)
 
 **▶️ To run:**
 
