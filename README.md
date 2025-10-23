@@ -1,5 +1,5 @@
 ---
-title: Embedding Gemma Modkit
+title: EmbeddingGemma Modkit
 emoji: 😻
 colorFrom: green
 colorTo: indigo
@@ -9,9 +9,9 @@ app_file: app.py
 pinned: false
 ---
 
-# 🤖 Embedding Gemma Modkit: Fine-Tuning and Mood Reader
+# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader
 
-This project provides a set of tools to fine-tune a sentence-embedding model to understand your personal taste in Hacker News titles and then use that model to score and rank new articles based on their "vibe."
+This project provides a set of tools to fine-tune EmbeddingGemma to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their "vibe."
 
 It includes three main applications:
 1.  A **Gradio App** for interactive fine-tuning, evaluation, and real-time "vibe checks."

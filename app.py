@@ -288,10 +288,11 @@ class HackerNewsFineTuner:
 
         md = (f"## Hacker News Top Stories (Model: `{self.config.MODEL_NAME}`{' - Fine-tuned' if self.last_hn_dataset else ''}) ⬇️\n"
               f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-              "| Vibe | Title | Comments | Published |\n|---|---|---|---|\n")
+              "| Vibe | Score | Title | Comments | Published |\n|---|---|---|---|---|\n")
         
         for item in scored_entries:
             md += (f"| {item['mood'].status_html} "
+                   f"| {item['mood'].raw_score:.4f} "
                    f"| [{item['title']}]({item['link']}) "
                    f"| [Comments]({item['comments']}) "
                    f"| {item['published']} |\n")
@@ -300,9 +301,9 @@ class HackerNewsFineTuner:
 
     ## Gradio Interface Setup ##
     def build_interface(self) -> gr.Blocks:
-        with gr.Blocks(title="Embedding Gemma Modkit") as demo:
-            gr.Markdown("# 🤖 Embedding Gemma Modkit: Fine-Tuning and Mood Reader")
-            gr.Markdown("See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
+        with gr.Blocks(title="EmbeddingGemma Modkit") as demo:
+            gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
+            gr.Markdown("This project provides a set of tools to fine-tune EmbeddingGemma to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
             with gr.Tab("🚀 Fine-Tuning & Evaluation"):
                 self._build_training_interface()
             with gr.Tab("💡 News Vibe Check"):
@@ -316,13 +317,13 @@ class HackerNewsFineTuner:
             gr.Markdown("## Fine-Tuning & Semantic Search\nSelect titles to fine-tune the model towards making them more similar to **`MY_FAVORITE_NEWS`**.")
             with gr.Row():
                 favorite_list = gr.CheckboxGroup(self.titles, type="index", label=f"Hacker News Top {len(self.titles)}", show_select_all=True)
-                output = gr.Textbox(lines=24, label="Training and Search Results", value="Click 'Run Fine-Tuning' to begin.")
+                output = gr.Textbox(lines=14, label="Training and Search Results", value="Click 'Run Fine-Tuning' to begin.")
             with gr.Row():
                 clear_reload_btn = gr.Button("Clear & Reload Model/Data")
                 run_training_btn = gr.Button("🚀 Run Fine-Tuning", variant="primary")
             gr.Markdown("--- \n ## Dataset & Model Management")
+            import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=50)
             with gr.Row():
-                import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=50)
                 download_dataset_btn = gr.Button("💾 Export Last HN Dataset")
                 download_model_btn = gr.Button("⬇️ Download Fine-Tuned Model")
             download_status = gr.Markdown("Ready.")
