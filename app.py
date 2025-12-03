@@ -322,6 +322,7 @@ class HackerNewsFineTuner:
                 clear_reload_btn = gr.Button("Clear & Reload Model/Data")
                 run_training_btn = gr.Button("🚀 Run Fine-Tuning", variant="primary")
             gr.Markdown("--- \n ## Dataset & Model Management")
+            gr.Markdown("To train on your own data, upload a CSV file with the following columns (no header required, or header ignored if present):\n1. **Anchor**: A fixed anchor phrase, `MY_FAVORITE_NEWS`.\n2. **Positive**: A title or contents that you like.\n3. **Negative**: A title or contents that you don't like.\n\nExample CSV Row:\n```\nMY_FAVORITE_NEWS,What is machine learning?,How to write a compiler from scratch.\n```")
             import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=50)
             with gr.Row():
                 download_dataset_btn = gr.Button("💾 Export Last HN Dataset")
