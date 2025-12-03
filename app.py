@@ -303,7 +303,7 @@ class HackerNewsFineTuner:
     def build_interface(self) -> gr.Blocks:
         with gr.Blocks(title="EmbeddingGemma Modkit") as demo:
             gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
-            gr.Markdown("This project provides a set of tools to fine-tune EmbeddingGemma to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
+            gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
             with gr.Tab("🚀 Fine-Tuning & Evaluation"):
                 self._build_training_interface()
             with gr.Tab("💡 News Vibe Check"):
