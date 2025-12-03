@@ -4,7 +4,7 @@ emoji: 😻
 colorFrom: green
 colorTo: indigo
 sdk: gradio
-sdk_version: 5.49.1
+sdk_version: 6.0.2
 app_file: app.py
 pinned: false
 ---
@@ -169,4 +169,3 @@ Key parameters can be adjusted in `config.py`:
     ├── index.html
     └── error.html
 ```
-
