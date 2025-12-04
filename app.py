@@ -332,11 +332,35 @@ class HackerNewsFineTuner:
                 dataset_output = gr.File(label="Download Dataset CSV", height=50, visible=False, interactive=False)
                 model_output = gr.File(label="Download Model ZIP", height=50, visible=False, interactive=False)
 
-            run_training_btn.click(fn=self.training, inputs=favorite_list, outputs=output)
+            buttons_to_lock = [
+                clear_reload_btn,
+                run_training_btn,
+                download_dataset_btn,
+                download_model_btn
+            ]
+
+            run_training_btn.click(
+                fn=lambda: [gr.update(interactive=False)]*len(buttons_to_lock),
+                outputs=buttons_to_lock
+            ).then(
+                fn=self.training, inputs=favorite_list, outputs=output
+            ).then(
+                fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
+                outputs=buttons_to_lock
+            )
             clear_reload_btn.click(fn=self.refresh_data_and_model, inputs=None, outputs=[favorite_list, output], queue=False)
             import_file.change(fn=self.import_additional_dataset, inputs=[import_file], outputs=download_status)
             download_dataset_btn.click(lambda: [gr.update(value=None, visible=False), "Generating..."], None, [dataset_output, download_status], queue=False).then(self.export_dataset, None, dataset_output).then(lambda p: [gr.update(visible=p is not None, value=p), "CSV ready." if p else "Export failed."], [dataset_output], [dataset_output, download_status])
-            download_model_btn.click(lambda: [gr.update(value=None, visible=False), "Zipping..."], None, [model_output, download_status], queue=False).then(self.download_model, None, model_output).then(lambda p: [gr.update(visible=p is not None, value=p), "ZIP ready." if p else "Zipping failed."], [model_output], [model_output, download_status])
+            download_model_btn.click(
+                fn=lambda: [gr.update(interactive=False)]*len(buttons_to_lock),
+                outputs=buttons_to_lock
+            ).then(
+                lambda: [gr.update(value=None, visible=False), "Zipping..."], None, [model_output, download_status], queue=False
+            ).then(self.download_model, None, model_output).then(lambda p: [gr.update(visible=p is not None, value=p), "ZIP ready." if p else "Zipping failed."], [model_output], [model_output, download_status]
+            ).then(
+                fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
+                outputs=buttons_to_lock
+            )
 
     def _build_vibe_check_interface(self):
         with gr.Column():
