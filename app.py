@@ -55,9 +55,6 @@ class HackerNewsFineTuner:
         # Authenticate once (global)
         authenticate_hf(self.config.HF_TOKEN)
 
-        # Note: We do NOT load data here immediately to keep init fast. 
-        # Data is loaded via the demo.load event.
-
     def _update_vibe_checker(self):
         """Initializes or updates the VibeChecker with the current model state."""
         if self.model:
@@ -95,7 +92,6 @@ class HackerNewsFineTuner:
             )
 
         # 2. Fetch fresh news data
-        # Note: Cache file is shared (global), which is fine/desired for RSS data.
         news_feed, status_msg = read_hacker_news_rss(self.config)
         titles_out, target_titles_out = [], []
         status_value: str = f"Ready. Session ID: {self.session_id[:8]}... | Status: {status_msg}"
@@ -150,7 +146,6 @@ class HackerNewsFineTuner:
             gr.Warning("No dataset generated yet.")
             return None
         
-        # Use session-specific path
         file_path = self.dataset_export_file
         try:
             with open(file_path, 'w', newline='', encoding='utf-8') as f:
@@ -170,7 +165,6 @@ class HackerNewsFineTuner:
         
         timestamp = int(time.time())
         try:
-            # Create zip in the session folder
             base_name = self.session_root / f"model_finetuned_{timestamp}"
             archive_path = shutil.make_archive(
                 base_name=str(base_name),
@@ -195,7 +189,7 @@ class HackerNewsFineTuner:
             return (self.titles[pool_id], self.titles[anchor_id]) if is_minority else (self.titles[anchor_id], self.titles[pool_id])
 
         if not pool_ids or not anchor_ids:
-             return [], "", "" # Should be caught by validation
+             return [], "", "" 
 
         fav_idx = pool_ids[0] if is_minority else list(anchor_ids)[0]
         non_fav_idx = list(anchor_ids)[0] if is_minority else pool_ids[0]
@@ -229,7 +223,6 @@ class HackerNewsFineTuner:
         result = "### Search (Before):\n" + f"{semantic_search_fn()}\n\n"
         print(f"[{self.session_id}] Starting Training...")
         
-        # Use session-specific output directory
         train_with_dataset(
             model=self.model, 
             dataset=final_dataset, 
@@ -300,14 +293,21 @@ class HackerNewsFineTuner:
 
 
 # --- Session Wrappers ---
-# These functions act as bridges between Gradio inputs and the session object.
-
-def create_session():
-    """Factory to create a new session object."""
-    return HackerNewsFineTuner(AppConfig)
 
 def refresh_wrapper(app):
-    return app.refresh_data_and_model()
+    """
+    Initializes the session if it's not already created, then runs the refresh.
+    Returns the app instance to update the State.
+    """
+    if app is None or callable(app) or isinstance(app, type):
+        print("Initializing new HackerNewsFineTuner session...")
+        app = HackerNewsFineTuner(AppConfig)
+    
+    # Run the refresh logic
+    update1, update2 = app.refresh_data_and_model()
+    
+    # Return 3 items: The App Instance (for State), Choice Update, Text Update
+    return app, update1, update2
 
 def import_wrapper(app, file):
     return app.import_additional_dataset(file)
@@ -332,8 +332,8 @@ def mood_feed_wrapper(app):
 
 def build_interface() -> gr.Blocks:
     with gr.Blocks(title="EmbeddingGemma Modkit") as demo:
-        # State object holds the user-specific instance of HackerNewsFineTuner
-        session_state = gr.State(create_session)
+        # Initialize state as None. It will be populated by refresh_wrapper on load.
+        session_state = gr.State()
 
         gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader (Multi-User)")
         gr.Markdown("Each browser tab creates a unique session with isolated training data and models.")
@@ -342,7 +342,6 @@ def build_interface() -> gr.Blocks:
             with gr.Column():
                 gr.Markdown("## Fine-Tuning & Semantic Search")
                 with gr.Row():
-                    # Choices are populated on load via refresh_wrapper
                     favorite_list = gr.CheckboxGroup(choices=[], type="index", label="Hacker News Top Stories", show_select_all=True)
                     output = gr.Textbox(lines=14, label="Training and Search Results", value="Loading data...")
                 
@@ -363,17 +362,20 @@ def build_interface() -> gr.Blocks:
                     dataset_output = gr.File(label="Dataset CSV", height=50, visible=False, interactive=False)
                     model_output = gr.File(label="Model ZIP", height=50, visible=False, interactive=False)
 
-                # Interactions
-                # Note: We pass session_state as the first input to all wrappers
+                # --- Interactions ---
                 
-                # 1. Initial Load
-                demo.load(fn=refresh_wrapper, inputs=[session_state], outputs=[favorite_list, output])
+                # 1. Initial Load: Initialize State and Load Data
+                demo.load(
+                    fn=refresh_wrapper, 
+                    inputs=[session_state], 
+                    outputs=[session_state, favorite_list, output]
+                )
 
                 # 2. Buttons
                 clear_reload_btn.click(
                     fn=refresh_wrapper, 
                     inputs=[session_state], 
-                    outputs=[favorite_list, output]
+                    outputs=[session_state, favorite_list, output]
                 )
                 
                 run_training_btn.click(
@@ -413,9 +415,9 @@ def build_interface() -> gr.Blocks:
 
         with gr.Tab("💡 Similarity Check"):
             with gr.Column():
-                gr.Markdown(f"## News Vibe Check Mood Lamp")
+                gr.Markdown(f"## News Similarity Check")
                 news_input = gr.Textbox(label="Enter News Title or Summary", lines=3)
-                vibe_check_btn = gr.Button("Check Vibe", variant="primary")
+                vibe_check_btn = gr.Button("Check Similarity", variant="primary")
                 with gr.Row():
                     vibe_color_block = gr.HTML(value='<div style="background-color: gray; height: 100px;"></div>', label="Mood Lamp")
                     with gr.Column():
