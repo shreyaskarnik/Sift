@@ -7,4 +7,3 @@ gradio
 html_to_markdown
 sentence-transformers
 git+https://github.com/huggingface/transformers@v4.56.0-Embedding-Gemma-preview
-spaces

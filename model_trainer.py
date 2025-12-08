@@ -1,4 +1,3 @@
-import spaces
 from huggingface_hub import login
 from sentence_transformers import SentenceTransformer, util
 from datasets import Dataset
@@ -18,7 +17,6 @@ def authenticate_hf(token: Optional[str]) -> None:
     else:
         print("Skipping Hugging Face login: HF_TOKEN not set.")
 
-@spaces.GPU
 def load_embedding_model(model_name: str) -> SentenceTransformer:
     """Initializes the Sentence Transformer model."""
     print(f"Loading Sentence Transformer model: {model_name}")
@@ -73,7 +71,6 @@ class EvaluationCallback(TrainerCallback):
         print(f"\n{self.search_fn()}\n")
 
 
-@spaces.GPU
 def train_with_dataset(
     model: SentenceTransformer,
     dataset: List[List[str]],
