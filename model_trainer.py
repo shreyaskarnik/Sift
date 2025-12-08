@@ -18,7 +18,7 @@ def authenticate_hf(token: Optional[str]) -> None:
     else:
         print("Skipping Hugging Face login: HF_TOKEN not set.")
 
-@space.GPU
+@spaces.GPU
 def load_embedding_model(model_name: str) -> SentenceTransformer:
     """Initializes the Sentence Transformer model."""
     print(f"Loading Sentence Transformer model: {model_name}")
