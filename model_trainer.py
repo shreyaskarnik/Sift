@@ -1,3 +1,4 @@
+import spaces
 from huggingface_hub import login
 from sentence_transformers import SentenceTransformer, util
 from datasets import Dataset
@@ -21,8 +22,8 @@ def load_embedding_model(model_name: str) -> SentenceTransformer:
     """Initializes the Sentence Transformer model."""
     print(f"Loading Sentence Transformer model: {model_name}")
     try:
-        model = SentenceTransformer(model_name)
-        print("Model loaded successfully.")
+        model = SentenceTransformer(model_name, model_kwargs={"device_map": "auto"})
+        print(f"Model loaded successfully. {model.device}")
         return model
     except Exception as e:
         print(f"Error loading Sentence Transformer model {model_name}: {e}")
@@ -71,6 +72,7 @@ class EvaluationCallback(TrainerCallback):
         print(f"\n{self.search_fn()}\n")
 
 
+@spaces.GPU
 def train_with_dataset(
     model: SentenceTransformer,
     dataset: List[List[str]],

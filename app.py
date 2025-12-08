@@ -1,4 +1,5 @@
 import gradio as gr
+import spaces
 import os
 import shutil
 import time
@@ -306,10 +307,10 @@ class HackerNewsFineTuner:
             gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
             with gr.Tab("🚀 Fine-Tuning & Evaluation"):
                 self._build_training_interface()
-            with gr.Tab("💡 News Vibe Check"):
-                self._build_vibe_check_interface()
             with gr.Tab("📰 Hacker News Mood Reader"):
                 self._build_mood_reader_interface()
+            with gr.Tab("💡 Similarity Check"):
+                self._build_vibe_check_interface()
         return demo
 
     def _build_training_interface(self):
