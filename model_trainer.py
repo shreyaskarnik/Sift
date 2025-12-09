@@ -1,4 +1,4 @@
-from huggingface_hub import login
+from huggingface_hub import login, HfApi # Updated import
 from sentence_transformers import SentenceTransformer, util
 from datasets import Dataset
 from sentence_transformers import SentenceTransformerTrainer, SentenceTransformerTrainingArguments
@@ -55,6 +55,36 @@ def get_top_hits(
         result.append(f"[{title}] {score:.4f}")
 
     return "\n".join(result)
+
+def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
+    """
+    Uploads a local model folder to the Hugging Face Hub.
+    Creates the repository if it doesn't exist.
+    """
+    try:
+        api = HfApi(token=token)
+        
+        # Get the authenticated user's username
+        user_info = api.whoami()
+        username = user_info['name']
+        
+        # Construct the full repo ID
+        repo_id = f"{username}/{repo_name}"
+        print(f"Preparing to upload to: {repo_id}")
+
+        # Create the repo (safe if it already exists)
+        api.create_repo(repo_id=repo_id, exist_ok=True)
+        
+        # Upload the folder
+        url = api.upload_folder(
+            folder_path=folder_path,
+            repo_id=repo_id,
+            repo_type="model"
+        )
+        return f"✅ Success! Model published at: {url}"
+    except Exception as e:
+        print(f"Upload failed: {e}")
+        return f"❌ Upload failed: {str(e)}"
 
 # --- Training Class and Function ---
 

@@ -14,7 +14,8 @@ from model_trainer import (
     authenticate_hf,
     train_with_dataset,
     get_top_hits,
-    load_embedding_model
+    load_embedding_model,
+    upload_model_to_hub
 )
 from config import AppConfig
 from vibe_logic import VibeChecker
@@ -177,6 +178,18 @@ class HackerNewsFineTuner:
             gr.Error(f"Zip failed: {e}")
             return None
 
+    def upload_model(self, repo_name: str, oauth_token_str: str) -> str:
+        """
+        Calls the model trainer upload function using the session's output directory.
+        """
+        if not os.path.exists(self.output_dir):
+            return "❌ Error: No trained model found in this session. Run training first."
+        if not repo_name.strip():
+            return "❌ Error: Please specify a repository name."
+            
+        return upload_model_to_hub(self.output_dir, repo_name, oauth_token_str)
+
+
     ## Training Logic ##
     def _create_hn_dataset(self, selected_ids: List[int]) -> Tuple[List[List[str]], str, str]:
         total_ids, selected_ids = set(self.number_list), set(selected_ids)
@@ -318,6 +331,18 @@ def export_wrapper(app):
 def download_model_wrapper(app):
     return app.download_model()
 
+def push_to_hub_wrapper(app, repo_name, oauth_token: Optional[gr.OAuthToken]):
+    """
+    Wrapper for pushing the model to the Hugging Face Hub.
+    Gradio automatically injects 'oauth_token' if the user is logged in via LoginButton.
+    """
+    if oauth_token is None:
+        return "⚠️ You must be logged in to push to the Hub. Please sign in above."
+    
+    # Extract the token string from the OAuthToken object
+    token_str = oauth_token.token
+    return app.upload_model(repo_name, token_str)
+
 def training_wrapper(app, selected_ids):
     return app.training(selected_ids)
 
@@ -335,8 +360,10 @@ def build_interface() -> gr.Blocks:
         # Initialize state as None. It will be populated by refresh_wrapper on load.
         session_state = gr.State()
 
-        gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
-        gr.Markdown("Each browser tab creates a unique session with isolated training data and models.")
+        with gr.Column():
+            gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
+            gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
+            gr.LoginButton(value="(Optional) Sign in to Hugging Face, if you want to push fine-tuned model to your repo.")
         
         with gr.Tab("🚀 Fine-Tuning & Evaluation"):
             with gr.Column():
@@ -362,6 +389,13 @@ def build_interface() -> gr.Blocks:
                     dataset_output = gr.File(label="Dataset CSV", height=50, visible=False, interactive=False)
                     model_output = gr.File(label="Model ZIP", height=50, visible=False, interactive=False)
 
+                gr.Markdown("### ☁️ Publish to Hugging Face Hub")
+                with gr.Row():
+                    repo_name_input = gr.Textbox(label="Target Repository Name", placeholder="e.g., my-news-vibe-model")
+                    push_to_hub_btn = gr.Button("Push to Hub", variant="secondary")
+                
+                push_status = gr.Markdown("")
+
                 # --- Interactions ---
                 
                 # 1. Initial Load: Initialize State and Load Data
@@ -375,7 +409,8 @@ def build_interface() -> gr.Blocks:
                     clear_reload_btn,
                     run_training_btn,
                     download_dataset_btn,
-                    download_model_btn
+                    download_model_btn,
+                    push_to_hub_btn
                 ]
 
                 # 2. Buttons
@@ -431,6 +466,13 @@ def build_interface() -> gr.Blocks:
                 ).then(
                     fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
                     outputs=buttons_to_lock
+                )
+
+                # Push to Hub Interaction
+                push_to_hub_btn.click(
+                    fn=push_to_hub_wrapper,
+                    inputs=[session_state, repo_name_input],
+                    outputs=[push_status]
                 )
 
         with gr.Tab("📰 Hacker News Mood Reader"):
