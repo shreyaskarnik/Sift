@@ -480,15 +480,15 @@ def build_interface() -> gr.Blocks:
                     outputs=[push_status]
                 )
 
-        with gr.Tab("📰 Hacker News Mood Reader"):
+        with gr.Tab("📰 Hacker News Similarity Check"):
             with gr.Column():
                 gr.Markdown(f"## Live Hacker News Feed Vibe")
-                gr.Markdown(f"This feed uses the current model (base or fine-tuned) to score the vibe of live HN stories against **`{AppConfig.QUERY_ANCHOR}`**.")
+                gr.Markdown(f"This feed uses the current model (base or fine-tuned) to score the vibe of live Hacker News stories against **`{AppConfig.QUERY_ANCHOR}`**.")
                 feed_output = gr.Markdown(value="Click 'Refresh Feed' to load stories.", label="Latest Stories")
                 refresh_button = gr.Button("Refresh Feed 🔄", size="lg", variant="primary")
                 refresh_button.click(fn=mood_feed_wrapper, inputs=[session_state], outputs=feed_output)
 
-        with gr.Tab("💡 Similarity Check"):
+        with gr.Tab("💡 Similarity Lamp"):
             with gr.Column():
                 gr.Markdown(f"## News Similarity Check")
                 gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.\n**Vibe Key:** Green = High, Red = Low")

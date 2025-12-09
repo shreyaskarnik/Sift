@@ -25,10 +25,10 @@ It includes three main applications:
 
 * **Interactive Fine-Tuning:** Use a Gradio interface to select your favorite Hacker News titles and fine-tune the `google/embeddinggemma-300m` model on your preferences.
 * **Semantic Search Evaluation:** See the immediate impact of your training by comparing semantic search results before and after fine-tuning.
-* **Live "Vibe Check":** Input any news title or text to get a real-time similarity score (its "vibe") against your personalized anchor.
-* **Interactive CLI:** A terminal-based mood reader with color-coded output, scrolling, and live refresh capabilities.
-* **Hacker News Mood Reader:** View the live Hacker News feed with each story scored and color-coded based on the current model's understanding of your taste.
 * **Data & Model Management:** Easily import additional training data, export the generated dataset, and download the fine-tuned model as a ZIP file.
+* **Hacker News Similarity Check:** View the live Hacker News feed with each story scored and color-coded based on the current model's understanding of your taste.
+* **Similarity Lamp:** Input any news title or text to get a real-time similarity score (its "vibe") against your personalized anchor.
+* **Interactive CLI:** A terminal-based mood reader with color-coded output, scrolling, and live refresh capabilities.
 * **Standalone Flask App:** A lightweight, read-only web app to continuously display the scored HN feed, perfect for simple deployment.
 
 ---
