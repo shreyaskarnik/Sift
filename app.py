@@ -491,6 +491,7 @@ def build_interface() -> gr.Blocks:
         with gr.Tab("💡 Similarity Check"):
             with gr.Column():
                 gr.Markdown(f"## News Similarity Check")
+                gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.\n**Vibe Key:** Green = High, Red = Low")
                 news_input = gr.Textbox(label="Enter News Title or Summary", lines=3)
                 vibe_check_btn = gr.Button("Check Similarity", variant="primary")
                 session_info_display = gr.Markdown()

@@ -166,6 +166,7 @@ Key parameters can be adjusted in `config.py`:
 ├── config.py               # Central configuration for all modules
 ├── requirements.txt        # Python package dependencies
 ├── README.md               # This file
+├── artifacts/              # Stores session-specific fine-tuned models and datasets
 └── templates/              # HTML templates for the Flask app
     ├── index.html
     └── error.html
