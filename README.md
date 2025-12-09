@@ -8,6 +8,7 @@ sdk_version: 5.49.1
 app_file: app.py
 pinned: false
 hf_oauth: true
+license: apache-2.0
 ---
 
 # 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader
