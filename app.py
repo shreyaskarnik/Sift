@@ -335,7 +335,7 @@ def build_interface() -> gr.Blocks:
         # Initialize state as None. It will be populated by refresh_wrapper on load.
         session_state = gr.State()
 
-        gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader (Multi-User)")
+        gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
         gr.Markdown("Each browser tab creates a unique session with isolated training data and models.")
         
         with gr.Tab("🚀 Fine-Tuning & Evaluation"):
@@ -370,18 +370,37 @@ def build_interface() -> gr.Blocks:
                     inputs=[session_state], 
                     outputs=[session_state, favorite_list, output]
                 )
+                
+                buttons_to_lock = [
+                    clear_reload_btn,
+                    run_training_btn,
+                    download_dataset_btn,
+                    download_model_btn
+                ]
 
                 # 2. Buttons
                 clear_reload_btn.click(
+                    fn=lambda: [gr.update(interactive=False)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
+                ).then(
                     fn=refresh_wrapper, 
                     inputs=[session_state], 
                     outputs=[session_state, favorite_list, output]
+                ).then(
+                    fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
                 )
                 
                 run_training_btn.click(
+                    fn=lambda: [gr.update(interactive=False)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
+                ).then(
                     fn=training_wrapper, 
                     inputs=[session_state, favorite_list], 
                     outputs=[output]
+                ).then(
+                    fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
                 )
 
                 import_file.change(
@@ -399,11 +418,19 @@ def build_interface() -> gr.Blocks:
                 )
 
                 download_model_btn.click(
+                    fn=lambda: [gr.update(interactive=False)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
+                ).then(
+                    lambda: [gr.update(value=None, visible=False), "Zipping..."], None, [model_output, download_status], queue=False
+                ).then(
                     fn=download_model_wrapper,
                     inputs=[session_state],
                     outputs=[model_output]
                 ).then(
-                    lambda p: gr.update(visible=True) if p else gr.update(), inputs=[model_output], outputs=[model_output]
+                    lambda p: [gr.update(visible=p is not None, value=p), "ZIP ready." if p else "Zipping failed."], [model_output], [model_output, download_status]
+                ).then(
+                    fn=lambda: [gr.update(interactive=True)]*len(buttons_to_lock),
+                    outputs=buttons_to_lock
                 )
 
         with gr.Tab("📰 Hacker News Mood Reader"):
