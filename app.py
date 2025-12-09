@@ -252,17 +252,19 @@ class HackerNewsFineTuner:
 
     ## Vibe Check Logic ##
     def get_vibe_check(self, news_text: str) -> Tuple[str, str, gr.update]:
+        info_text = f"**Session:** {self.session_id[:6]}<br>**Model:** `{self.config.MODEL_NAME}`{' - Fine-tuned' if self.last_hn_dataset else ''}"
+
         if not self.vibe_checker:
-            return "N/A", "Model Loading...", gr.update(value=self._generate_vibe_html("gray"))
+            return "N/A", "Model Loading...", gr.update(value=self._generate_vibe_html("gray")), info_text
         if not news_text or len(news_text.split()) < 3:
-            return "N/A", "Text too short", gr.update(value=self._generate_vibe_html("white"))
+            return "N/A", "Text too short", gr.update(value=self._generate_vibe_html("white")), info_text
 
         try:
             vibe_result = self.vibe_checker.check(news_text)
             status = vibe_result.status_html.split('>')[1].split('<')[0]
-            return f"{vibe_result.raw_score:.4f}", status, gr.update(value=self._generate_vibe_html(vibe_result.color_hsl))
+            return f"{vibe_result.raw_score:.4f}", status, gr.update(value=self._generate_vibe_html(vibe_result.color_hsl)), info_text
         except Exception as e:
-            return "N/A", f"Error: {e}", gr.update(value=self._generate_vibe_html("gray"))
+            return "N/A", f"Error: {e}", gr.update(value=self._generate_vibe_html("gray")), info_text
 
     def _generate_vibe_html(self, color: str) -> str:
         return f'<div style="background-color: {color}; height: 100px; border-radius: 12px; border: 2px solid #ccc;"></div>'
@@ -292,7 +294,9 @@ class HackerNewsFineTuner:
 
         scored_entries.sort(key=lambda x: x["mood"].raw_score, reverse=True)
 
-        md = (f"## Hacker News Mood (Session: {self.session_id[:6]})\n"
+        md = (f"## Hacker News Top Stories\n"
+              f"**Session:** {self.session_id[:6]}<br>"
+              f"**Model:** `{self.config.MODEL_NAME}`{' - Fine-tuned' if self.last_hn_dataset else ''}<br>"
               f"**Updated:** {datetime.now().strftime('%H:%M:%S')}\n\n"
               "| Vibe | Score | Title | Comments | Published |\n|---|---|---|---|---|\n")
         
@@ -367,7 +371,7 @@ def build_interface() -> gr.Blocks:
         
         with gr.Tab("🚀 Fine-Tuning & Evaluation"):
             with gr.Column():
-                gr.Markdown("## Fine-Tuning & Semantic Search")
+                gr.Markdown("## Fine-Tuning & Semantic Search\nSelect titles to fine-tune the model towards making them more similar to **`MY_FAVORITE_NEWS`**.")
                 with gr.Row():
                     favorite_list = gr.CheckboxGroup(choices=[], type="index", label="Hacker News Top Stories", show_select_all=True)
                     output = gr.Textbox(lines=14, label="Training and Search Results", value="Loading data...")
@@ -377,17 +381,18 @@ def build_interface() -> gr.Blocks:
                     run_training_btn = gr.Button("🚀 Run Fine-Tuning", variant="primary")
                 
                 gr.Markdown("--- \n ## Dataset & Model Management")
+                gr.Markdown("To train on your own data, upload a CSV file with the following columns (no header required, or header ignored if present):\n1. **Anchor**: A fixed anchor phrase, `MY_FAVORITE_NEWS`.\n2. **Positive**: A title or contents that you like.\n3. **Negative**: A title or contents that you don't like.\n\nExample CSV Row:\n```\nMY_FAVORITE_NEWS,What is machine learning?,How to write a compiler from scratch.\n```")
                 import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=50)
                 
                 with gr.Row():
                     download_dataset_btn = gr.Button("💾 Export Dataset")
-                    download_model_btn = gr.Button("⬇️ Download Model")
+                    download_model_btn = gr.Button("⬇️ Download Fine-Tuned Model")
                 
                 download_status = gr.Markdown("Ready.")
                 
                 with gr.Row():
-                    dataset_output = gr.File(label="Dataset CSV", height=50, visible=False, interactive=False)
-                    model_output = gr.File(label="Model ZIP", height=50, visible=False, interactive=False)
+                    dataset_output = gr.File(label="Download Dataset CSV", height=50, visible=False, interactive=False)
+                    model_output = gr.File(label="Download Model ZIP", height=50, visible=False, interactive=False)
 
                 gr.Markdown("### ☁️ Publish to Hugging Face Hub")
                 with gr.Row():
@@ -478,7 +483,8 @@ def build_interface() -> gr.Blocks:
         with gr.Tab("📰 Hacker News Mood Reader"):
             with gr.Column():
                 gr.Markdown(f"## Live Hacker News Feed Vibe")
-                feed_output = gr.Markdown(value="Click 'Refresh Feed'...", label="Latest Stories")
+                gr.Markdown(f"This feed uses the current model (base or fine-tuned) to score the vibe of live HN stories against **`{AppConfig.QUERY_ANCHOR}`**.")
+                feed_output = gr.Markdown(value="Click 'Refresh Feed' to load stories.", label="Latest Stories")
                 refresh_button = gr.Button("Refresh Feed 🔄", size="lg", variant="primary")
                 refresh_button.click(fn=mood_feed_wrapper, inputs=[session_state], outputs=feed_output)
 
@@ -487,6 +493,8 @@ def build_interface() -> gr.Blocks:
                 gr.Markdown(f"## News Similarity Check")
                 news_input = gr.Textbox(label="Enter News Title or Summary", lines=3)
                 vibe_check_btn = gr.Button("Check Similarity", variant="primary")
+                session_info_display = gr.Markdown()
+
                 with gr.Row():
                     vibe_color_block = gr.HTML(value='<div style="background-color: gray; height: 100px;"></div>', label="Mood Lamp")
                     with gr.Column():
@@ -496,7 +504,7 @@ def build_interface() -> gr.Blocks:
                 vibe_check_btn.click(
                     fn=vibe_check_wrapper, 
                     inputs=[session_state, news_input], 
-                    outputs=[vibe_score, vibe_status, vibe_color_block]
+                    outputs=[vibe_score, vibe_status, vibe_color_block, session_info_display]
                 )
 
     return demo
