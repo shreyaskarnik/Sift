@@ -494,6 +494,19 @@ def build_interface() -> gr.Blocks:
                 gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.\n**Vibe Key:** Green = High, Red = Low")
                 news_input = gr.Textbox(label="Enter News Title or Summary", lines=3)
                 vibe_check_btn = gr.Button("Check Similarity", variant="primary")
+                
+                gr.Examples(
+                    examples=[
+                        "Global Markets Rally as Inflation Data Shows Unexpected Drop for Third Consecutive Month",
+                        "Astronomers Detect Strong Oxygen Signature on Potentially Habitable Exoplanet",
+                        "City Council Approves Controversial Plan to Ban Cars from Downtown District by 2027",
+                        "Tech Giant Unveils Prototype for \"Invisible\" AR Glasses, Promising a Screen-Free Future",
+                        "Local Library Receives Overdue Book Checked Out in 1948 With An Anonymous Apology Note"
+                    ],
+                    inputs=news_input,
+                    label="Try these examples"
+                )
+
                 session_info_display = gr.Markdown()
 
                 with gr.Row():
