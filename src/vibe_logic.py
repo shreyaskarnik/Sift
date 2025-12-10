@@ -23,7 +23,7 @@ VIBE_THRESHOLDS: List[VibeThreshold] = [
     VibeThreshold(score=0.8, status="✨ VIBE:HIGH"),
     VibeThreshold(score=0.5, status="👍 VIBE:GOOD"),
     VibeThreshold(score=0.2, status="😐 VIBE:FLAT"),
-    VibeThreshold(score=0.0, status="👎 VIBE:LOW&nbsp;"),  # Base case for scores < 0.2
+    VibeThreshold(score=0.0, status="👎 VIBE:LOW"),  # Base case for scores < 0.2
 ]
 
 # --- Utility Functions ---
