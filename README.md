@@ -157,7 +157,7 @@ Key parameters can be adjusted in `config.py`:
 
 ```
 .
-├── app.py                  # Main Gradio application for fine-tuning
+├── app.py                  # Main Gradio application entry point
 ├── cli_mood_reader.py      # Interactive command-line mood reader
 ├── flask_app.py            # Standalone Flask application for mood reading
 ├── src/                    # Source code for the application
@@ -165,10 +165,12 @@ Key parameters can be adjusted in `config.py`:
 │   ├── data_fetcher.py     # Fetches and caches the Hacker News RSS feed
 │   ├── hn_mood_reader.py   # Core logic for fetching and scoring
 │   ├── model_trainer.py    # Handles model loading and fine-tuning
+│   ├── session_manager.py  # Manages user sessions and application state
+│   ├── ui.py               # Defines the Gradio user interface
 │   └── vibe_logic.py       # Calculates similarity scores and "vibe" status
 ├── requirements.txt        # Python package dependencies
 ├── README.md               # This file
-├── artifacts/              # Stores session-specific fine-tuned models and datasets
+├── artifacts/              # Stores session-specific fine-tuned models and datasets (generated)
 └── templates/              # HTML templates for the Flask app
     ├── index.html
     └── error.html
