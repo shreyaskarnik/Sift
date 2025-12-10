@@ -9,16 +9,16 @@ from typing import List, Iterable, Tuple, Optional, Callable
 from datetime import datetime
 
 # Import modules
-from data_fetcher import read_hacker_news_rss, format_published_time
-from model_trainer import (
+from src.data_fetcher import read_hacker_news_rss, format_published_time
+from src.model_trainer import (
     authenticate_hf,
     train_with_dataset,
     get_top_hits,
     load_embedding_model,
     upload_model_to_hub
 )
-from config import AppConfig
-from vibe_logic import VibeChecker
+from src.config import AppConfig
+from src.vibe_logic import VibeChecker
 from sentence_transformers import SentenceTransformer
 
 # --- Main Application Class (Session Scoped) ---

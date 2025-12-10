@@ -7,8 +7,8 @@ from typing import Optional
 from flask import Flask, render_template
 
 # Your existing config and core logic
-from config import AppConfig
-from hn_mood_reader import HnMoodReader, FeedEntry
+from src.config import AppConfig
+from src.hn_mood_reader import HnMoodReader, FeedEntry
 
 # --- Flask App Initialization ---
 app = Flask(__name__)

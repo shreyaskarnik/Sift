@@ -7,9 +7,9 @@ from typing import List
 
 # --- Core Logic Imports ---
 # These modules contain the application's functionality.
-from config import AppConfig
-from hn_mood_reader import HnMoodReader, FeedEntry
-from vibe_logic import VIBE_THRESHOLDS
+from src.config import AppConfig
+from src.hn_mood_reader import HnMoodReader, FeedEntry
+from src.vibe_logic import VIBE_THRESHOLDS
 
 # --- Helper Functions ---
 
