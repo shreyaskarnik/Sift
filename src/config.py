@@ -45,9 +45,6 @@ class AppConfig:
     # Anchor text used for contrastive learning dataset generation
     QUERY_ANCHOR: Final[str] = "MY_FAVORITE_NEWS"
 
-    # Number of titles shown for user selection in the Gradio interface
-    TOP_TITLES_COUNT: Final[int] = 10
-
     # Default export path for the dataset CSV
     DATASET_EXPORT_FILENAME: Final[Path] = ARTIFACTS_DIR.joinpath("training_dataset.csv")
 

@@ -45,8 +45,6 @@ class HackerNewsFineTuner:
         self.model: Optional[SentenceTransformer] = None
         self.vibe_checker: Optional[VibeChecker] = None
         self.titles: List[str] = [] 
-        self.target_titles: List[str] = [] 
-        self.number_list: List[int] = [] 
         self.last_hn_dataset: List[List[str]] = [] 
         self.imported_dataset: List[List[str]] = [] 
 
@@ -66,9 +64,12 @@ class HackerNewsFineTuner:
 
     ## Data and Model Management ##
 
-    def refresh_data_and_model(self) -> Tuple[gr.update, gr.update]:
+    def refresh_data_and_model(self) -> Tuple[List[str], str]:
         """
         Reloads model and fetches data.
+        Returns:
+            - List of titles (for the UI)
+            - Status message string
         """
         print(f"[{self.session_id}] Reloading model and data...")
 
@@ -84,34 +85,23 @@ class HackerNewsFineTuner:
             print(error_msg)
             self.model = None
             self._update_vibe_checker()
-            return (
-                gr.update(choices=[], label="Model Load Failed"),
-                gr.update(value=error_msg)
-            )
+            return [], error_msg
 
         # 2. Fetch fresh news data
         news_feed, status_msg = read_hacker_news_rss(self.config)
-        titles_out, target_titles_out = [], []
+        titles_out = []
         status_value: str = f"Ready. Session ID: {self.session_id[:8]}... | Status: {status_msg}"
 
         if news_feed is not None and news_feed.entries:
-            titles_out = [item.title for item in news_feed.entries[:self.config.TOP_TITLES_COUNT]]
-            target_titles_out = [item.title for item in news_feed.entries[self.config.TOP_TITLES_COUNT:]]
+            titles_out = [item.title for item in news_feed.entries]
         else:
-            titles_out = ["Error fetching news.", "Check console."]
+            titles_out = ["Error fetching news."]
             gr.Warning(f"Data reload failed. {status_msg}")
 
         self.titles = titles_out
-        self.target_titles = target_titles_out
-        self.number_list = list(range(len(self.titles)))
 
-        return (
-            gr.update(
-                choices=self.titles,
-                label=f"Hacker News Top {len(self.titles)} (Select your favorites)"
-            ),
-            gr.update(value=status_value)
-        )
+        # Return raw list of titles + status text
+        return self.titles, status_value
 
     # --- Import Dataset/Export ---
     def import_additional_dataset(self, file_path: str) -> str:
@@ -123,6 +113,7 @@ class HackerNewsFineTuner:
                 reader = csv.reader(f)
                 try:
                     header = next(reader)
+                    # Simple heuristic to detect if header exists
                     if not (header and header[0].lower().strip() == 'anchor'):
                         f.seek(0)
                 except StopIteration:
@@ -188,54 +179,75 @@ class HackerNewsFineTuner:
 
 
     ## Training Logic ##
-    def _create_hn_dataset(self, selected_ids: List[int]) -> Tuple[List[List[str]], str, str]:
-        total_ids, selected_ids = set(self.number_list), set(selected_ids)
-        non_selected_ids = total_ids - selected_ids
-        is_minority = len(selected_ids) < (len(total_ids) / 2)
+    def _create_hn_dataset(self, pos_ids: List[int], neg_ids: List[int]) -> List[List[str]]:
+        """
+        Creates triplets (Anchor, Positive, Negative) from the selected indices.
+        Uses cycling to balance the dataset if the number of positives != negatives.
+        """
+        if not pos_ids or not neg_ids:
+            return []
 
-        anchor_ids, pool_ids = (non_selected_ids, list(selected_ids)) if is_minority else (selected_ids, list(non_selected_ids))
+        # Convert indices to actual title strings
+        pos_titles = [self.titles[i] for i in pos_ids]
+        neg_titles = [self.titles[i] for i in neg_ids]
 
-        def get_titles(anchor_id, pool_id):
-            return (self.titles[pool_id], self.titles[anchor_id]) if is_minority else (self.titles[anchor_id], self.titles[pool_id])
+        dataset = []
 
-        if not pool_ids or not anchor_ids:
-             return [], "", "" 
+        # We need to pair every Positive with a Negative.
+        # Strategy: Iterate over the longer list and cycle through the shorter list
+        # to ensure every selected item is used at least once and the dataset is balanced.
+        
+        if len(pos_titles) >= len(neg_titles):
+            # More positives than negatives: Iterate positives, reuse negatives
+            neg_cycle = cycle(neg_titles)
+            for p_title in pos_titles:
+                dataset.append([self.config.QUERY_ANCHOR, p_title, next(neg_cycle)])
+        else:
+            # More negatives than positives: Iterate negatives, reuse positives
+            pos_cycle = cycle(pos_titles)
+            for n_title in neg_titles:
+                dataset.append([self.config.QUERY_ANCHOR, next(pos_cycle), n_title])
 
-        fav_idx = pool_ids[0] if is_minority else list(anchor_ids)[0]
-        non_fav_idx = list(anchor_ids)[0] if is_minority else pool_ids[0]
+        return dataset
 
-        hn_dataset = []
-        pool_cycler = cycle(pool_ids)
-        for anchor_id in sorted(list(anchor_ids)):
-            fav, non_fav = get_titles(anchor_id, next(pool_cycler))
-            hn_dataset.append([self.config.QUERY_ANCHOR, fav, non_fav])
-
-        return hn_dataset, self.titles[fav_idx], self.titles[non_fav_idx]
-
-    def training(self, selected_ids: List[int]) -> str:
+    def training(self, pos_ids: List[int], neg_ids: List[int]) -> str:
+        """
+        Main training entry point.
+        Args:
+            pos_ids: Indices of stories marked as "Favorite"
+            neg_ids: Indices of stories marked as "Dislike"
+        """
         if self.model is None:
              raise gr.Error("Model not loaded.")
-        if not selected_ids:
-            raise gr.Error("Select at least one title.")
-        if len(selected_ids) == len(self.number_list):
-            raise gr.Error("Cannot select all titles.")
-
-        hn_dataset, _, _ = self._create_hn_dataset(selected_ids)
-        self.last_hn_dataset = hn_dataset
-        final_dataset = self.last_hn_dataset + self.imported_dataset
         
-        if not final_dataset:
-            raise gr.Error("Dataset is empty.")
+        # Validation
+        if not pos_ids:
+            raise gr.Error("Please select at least one 'Favorite' story.")
+        if not neg_ids:
+            raise gr.Error("Please select at least one 'Dislike' story.")
+        
+        # Generate Dataset
+        hn_dataset = self._create_hn_dataset(pos_ids, neg_ids)
+        
+        # Merge with imported dataset if it exists
+        if self.imported_dataset:
+            # If we have both, combine them
+            self.last_hn_dataset = hn_dataset + self.imported_dataset
+        else:
+            self.last_hn_dataset = hn_dataset
+                    
+        if not self.last_hn_dataset:
+            raise gr.Error("Dataset generation failed (Empty dataset).")
 
         def semantic_search_fn() -> str:
-            return get_top_hits(model=self.model, target_titles=self.target_titles, task_name=self.config.TASK_NAME, query=self.config.QUERY_ANCHOR)
+            return get_top_hits(model=self.model, target_titles=self.titles, task_name=self.config.TASK_NAME, query=self.config.QUERY_ANCHOR)
 
         result = "### Search (Before):\n" + f"{semantic_search_fn()}\n\n"
-        print(f"[{self.session_id}] Starting Training...")
+        print(f"[{self.session_id}] Starting Training with {len(self.last_hn_dataset)} examples...")
         
         train_with_dataset(
             model=self.model, 
-            dataset=final_dataset, 
+            dataset=self.last_hn_dataset, 
             output_dir=self.output_dir, 
             task_name=self.config.TASK_NAME, 
             search_fn=semantic_search_fn
@@ -246,6 +258,9 @@ class HackerNewsFineTuner:
 
         result += "### Search (After):\n" + f"{semantic_search_fn()}"
         return result
+
+    def is_model_tuned(self) -> bool:
+        return True if self.last_hn_dataset else False
 
     ## Vibe Check Logic ##
     def get_vibe_check(self, news_text: str) -> Tuple[str, str, gr.update]:
