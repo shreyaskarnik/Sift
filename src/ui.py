@@ -158,11 +158,11 @@ def build_interface() -> gr.Blocks:
                                 gr.Markdown("*No stories loaded. Click 'Reset Model & Fine-tuning state' to fetch data.*")
                                 return
                             
-                            for i, title in enumerate(stories):
+                            for i, title in enumerate(stories[:10]):
                                 with gr.Row(variant="compact", elem_id=f"story_row_{i}"):
                                     # Title
                                     with gr.Column(scale=3):
-                                    	gr.Markdown(f"**{i+1}.** {title}")
+                                    	gr.Markdown(f"{title}")
                                     
                                     # Radio Selection
                                     radio = gr.Radio(
