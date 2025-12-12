@@ -31,7 +31,7 @@ class AppConfig:
     # --- Model/Training Configuration ---
 
     # Name of the pre-trained embedding model
-    MODEL_NAME: Final[str] = 'google/embeddinggemma-300M'
+    MODEL_NAME: Final[str] = 'google/embeddinggemma-300m'
 
     # Task name for prompting the embedding model (e.g., for instruction tuning)
     TASK_NAME: Final[str] = "Classification"
