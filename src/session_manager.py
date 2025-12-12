@@ -219,22 +219,18 @@ class HackerNewsFineTuner:
         """
         if self.model is None:
              raise gr.Error("Model not loaded.")
-        
-        # Validation
-        if not pos_ids:
-            raise gr.Error("Please select at least one 'Favorite' story.")
-        if not neg_ids:
-            raise gr.Error("Please select at least one 'Dislike' story.")
-        
-        # Generate Dataset
-        hn_dataset = self._create_hn_dataset(pos_ids, neg_ids)
-        
-        # Merge with imported dataset if it exists
+             
         if self.imported_dataset:
-            # If we have both, combine them
-            self.last_hn_dataset = hn_dataset + self.imported_dataset
+            self.last_hn_dataset = self.imported_dataset
         else:
-            self.last_hn_dataset = hn_dataset
+            # Validation
+            if not pos_ids:
+                raise gr.Error("Please select at least one 'Favorite' story.")
+            if not neg_ids:
+                raise gr.Error("Please select at least one 'Dislike' story.")
+        
+            # Generate Dataset
+            self.last_hn_dataset = self._create_hn_dataset(pos_ids, neg_ids)
                     
         if not self.last_hn_dataset:
             raise gr.Error("Dataset generation failed (Empty dataset).")
@@ -264,22 +260,29 @@ class HackerNewsFineTuner:
 
     ## Vibe Check Logic ##
     def get_vibe_check(self, news_text: str) -> Tuple[str, str, gr.update]:
-        info_text = f"**Session:** {self.session_id[:6]}<br>**Model:** `{self.config.MODEL_NAME}`{' - Fine-tuned' if self.last_hn_dataset else ''}"
+        model_name = "<unsaved>"
+        if self.last_hn_dataset:
+            model_name = f"./{self.output_dir}"
+
+        info_text = (f"**Session:** {self.session_id[:6]}<br>"
+                     f"**Base Model:** `{self.config.MODEL_NAME}`<br>"
+                     f"**Tuned Model:** `{model_name}`")
 
         if not self.vibe_checker:
-            return "N/A", "Model Loading...", gr.update(value=self._generate_vibe_html("gray")), info_text
+            return "N/A", "Model Loading...", gr.update(value=self._generate_vibe_css("gray")), info_text
         if not news_text or len(news_text.split()) < 3:
-            return "N/A", "Text too short", gr.update(value=self._generate_vibe_html("white")), info_text
+            return "N/A", "Text too short", gr.update(value=self._generate_vibe_css("gray")), info_text
 
         try:
             vibe_result = self.vibe_checker.check(news_text)
             status = vibe_result.status_html.split('>')[1].split('<')[0]
-            return f"{vibe_result.raw_score:.4f}", status, gr.update(value=self._generate_vibe_html(vibe_result.color_hsl)), info_text
+            return f"{vibe_result.raw_score:.4f}", status, gr.update(value=self._generate_vibe_css(vibe_result.color_hsl)), info_text
         except Exception as e:
-            return "N/A", f"Error: {e}", gr.update(value=self._generate_vibe_html("gray")), info_text
+            return "N/A", f"Error: {e}", gr.update(value=self._generate_vibe_css("gray")), info_text
 
-    def _generate_vibe_html(self, color: str) -> str:
-        return f'<div style="background-color: {color}; height: 100px; border-radius: 12px; border: 2px solid #ccc;"></div>'
+    def _generate_vibe_css(self, color: str) -> str:
+        """Generates a style block to update the Mood Lamp textbox background."""
+        return f"<style>#mood_lamp input {{ background-color: {color} !important; transition: background-color 0.5s ease; }}</style>"
 
     ## Mood Reader Logic ##
     def fetch_and_display_mood_feed(self) -> str:

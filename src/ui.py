@@ -361,10 +361,10 @@ def build_interface() -> gr.Blocks:
         with gr.Tab("🧪 Vibe Check Playground"):
             with gr.Column():
                 gr.Markdown(f"## News Similarity Check")
-                gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.\n**Vibe Key:** Green = High, Red = Low")
-                news_input = gr.Textbox(label="Enter News Title or Summary", lines=3)
-                vibe_check_btn = gr.Button("Check Similarity", variant="primary")
-                
+                gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.<br>**Vibe Key:** <span style='color:green'>Green = High</span>, <span style='color:yellow'>Yellow = Neutral</span>, <span style='color:red'>Red = Low</span>")
+
+                news_input = gr.Textbox(label="Enter News Title or Summary", lines=3, render=False)
+
                 gr.Examples(
                     examples=[
                         "Global Markets Rally as Inflation Data Shows Unexpected Drop for Third Consecutive Month",
@@ -376,19 +376,22 @@ def build_interface() -> gr.Blocks:
                     inputs=news_input,
                     label="Try these examples"
                 )
-
+                
+                news_input.render()
+                vibe_check_btn = gr.Button("Check Similarity", variant="primary")
+                
                 session_info_display = gr.Markdown()
 
-                with gr.Row():
-                    vibe_color_block = gr.HTML(value='<div style="background-color: gray; height: 100px;"></div>', label="Mood Lamp")
-                    with gr.Column():
-                        vibe_score = gr.Textbox(label="Score", value="N/A", interactive=False)
-                        vibe_status = gr.Textbox(label="Status", value="...", interactive=False)
+                with gr.Column():
+                    vibe_score = gr.Textbox(label="Score", value="N/A", interactive=False)
+                    vibe_lamp = gr.Textbox(label="Mood Lamp", max_lines=1, elem_id="mood_lamp", interactive=False)
+                    vibe_status = gr.Textbox(label="Status", value="...", interactive=False)
+                    style_thml = gr.HTML(value="<style>#mood_lamp input {background-color: gray;}</style>")
                 
                 vibe_check_btn.click(
                     fn=vibe_check_wrapper, 
                     inputs=[session_state, news_input], 
-                    outputs=[vibe_score, vibe_status, vibe_color_block, session_info_display]
+                    outputs=[vibe_score, vibe_status, style_thml, session_info_display]
                 )
 
     return demo
