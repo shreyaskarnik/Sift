@@ -34,23 +34,44 @@ def refresh_wrapper(app):
     
     return app, choices_list, empty_labels, log_update
 
+def update_hub_interactive(app, username: Optional[str] = None):
+    """
+    Updates the interactivity of Hub components.
+    Accepts 'username' (str) to allow reuse by both on_app_load (profile extraction)
+    and post-training events (using stored username state).
+    """
+    is_logged_in = username is not None
+    
+    # Check if model is ready (app exists and has a dataset generated)
+    has_model_tuned = (app is not None) and (getattr(app, 'last_hn_dataset', None) is not None)
+
+    # Repo input only needs login
+    repo_interactive = gr.update(interactive=is_logged_in)
+    
+    # Push button needs Login AND a Ready Model
+    can_push = is_logged_in and has_model_tuned
+    push_interactive = gr.update(interactive=can_push)
+
+    return repo_interactive, push_interactive
+
 def on_app_load(app, profile: Optional[gr.OAuthProfile] = None):
     """
     Combined wrapper for initial load:
     1. Initializes/Refreshes App Session
-    2. Checks OAuth Profile to enable/disable Hub features
+    2. Extracts Username from Profile
+    3. Updates Hub Buttons based on login status
     """
-    # 1. Reuse the logic from refresh_wrapper
+    # 1. Initialize/Refresh Session
     app, stories, labels, text_update = refresh_wrapper(app)
     
-    # 2. Check Login Status
-    is_logged_in = profile is not None
-    username = profile.username if is_logged_in else None
+    # 2. Extract Username safely
+    username = profile.username if profile else None
     
-    hub_interactive = gr.update(interactive=is_logged_in)
-    
-    # Return items matching the output signature of demo.load
-    return app, stories, labels, text_update, hub_interactive, hub_interactive, username
+    # 3. Get UI Updates using the helper
+    repo_update, push_update = update_hub_interactive(app, username)
+
+    # Return 7 items: App state, Data updates (3), Hub updates (2), Username state (1)
+    return app, stories, labels, text_update, repo_update, push_update, username
 
 def update_repo_preview(username, repo_name):
     """Updates the markdown preview to show 'username/repo_name'."""
@@ -299,6 +320,10 @@ def build_interface() -> gr.Blocks:
             ).then(
                 # Unlock all buttons (including downloads now that we have a model)
                 fn=lambda: set_interactivity(True), outputs=action_buttons
+            ).then(
+                fn=update_hub_interactive,
+                inputs=[session_state, username_state],
+                outputs=[repo_name_input, push_to_hub_btn]
             )
             
             # 5. Downloads
