@@ -13,14 +13,6 @@ LABEL_DIS = "👎"
 # --- Session Wrappers ---
 
 def refresh_wrapper(app):
-    """
-    Initializes the session if it's not already created, then runs the refresh.
-    Returns:
-    1. App instance
-    2. Stories List (List[str])
-    3. Empty Labels Dict (Dict)
-    4. Log text
-    """
     if app is None or callable(app) or isinstance(app, type):
         print("Initializing new HackerNewsFineTuner session...")
         app = HackerNewsFineTuner(AppConfig)
@@ -35,32 +27,12 @@ def refresh_wrapper(app):
     return app, choices_list, empty_labels, log_update
 
 def update_hub_interactive(app, username: Optional[str] = None):
-    """
-    Updates the interactivity of Hub components.
-    Accepts 'username' (str) to allow reuse by both on_app_load (profile extraction)
-    and post-training events (using stored username state).
-    """
     is_logged_in = username is not None
+    has_model_tuned = app is not None and bool(app.last_hn_dataset)
     
-    # Check if model is ready (app exists and has a dataset generated)
-    has_model_tuned = (app is not None) and app.last_hn_dataset
-
-    # Repo input only needs login
-    repo_interactive = gr.update(interactive=is_logged_in)
-    
-    # Push button needs Login AND a Ready Model
-    can_push = is_logged_in and has_model_tuned
-    push_interactive = gr.update(interactive=can_push)
-
-    return repo_interactive, push_interactive
+    return gr.update(interactive=is_logged_in), gr.update(interactive=is_logged_in and has_model_tuned)
 
 def on_app_load(app, profile: Optional[gr.OAuthProfile] = None):
-    """
-    Combined wrapper for initial load:
-    1. Initializes/Refreshes App Session
-    2. Extracts Username from Profile
-    3. Updates Hub Buttons based on login status
-    """
     # 1. Initialize/Refresh Session
     app, stories, labels, text_update = refresh_wrapper(app)
     
@@ -283,11 +255,17 @@ def build_interface() -> gr.Blocks:
             clear_reload_btn.click(
                 fn=lambda: set_interactivity(False), outputs=action_buttons
             ).then(
+                fn=lambda: gr.update(interactive=False), outputs=push_to_hub_btn
+            ).then(
                 fn=refresh_wrapper, 
                 inputs=[session_state], 
                 outputs=[session_state, stories_state, labels_state, output]
             ).then(
                 fn=lambda: [gr.update(interactive=True)]*2, outputs=[clear_reload_btn, run_training_btn]
+            ).then(
+                fn=update_hub_interactive,
+                inputs=[session_state, username_state],
+                outputs=[repo_name_input, push_to_hub_btn]
             )
             
             # Reset Selection Button Logic
