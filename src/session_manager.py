@@ -306,10 +306,15 @@ class HackerNewsFineTuner:
 
         scored_entries.sort(key=lambda x: x["mood"].raw_score, reverse=True)
 
+        model_name = "<unsaved>"
+        if self.last_hn_dataset:
+            model_name = f"./{self.output_dir}"
+
         md = (f"## Hacker News Top Stories\n"
               f"**Session:** {self.session_id[:6]}<br>"
-              f"**Model:** `{self.config.MODEL_NAME}`{' - Fine-tuned' if self.last_hn_dataset else ''}<br>"
-              f"**Updated:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+              f"**Base Model:** `{self.config.MODEL_NAME}`<br>"
+              f"**Tuned Model:** `{model_name}`<br>"
+              f"**Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
               "| Vibe | Score | Title | Comments | Published |\n|---|---|---|---|---|\n")
         
         for item in scored_entries:

@@ -119,7 +119,7 @@ def build_interface() -> gr.Blocks:
             gr.Markdown("# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader")
             gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/README.md) for more details.")
         
-        with gr.Tab("🚀 Fine-Tuning & Evaluation"):
+        with gr.Tab("⚙️ Train & Export"):
             
             # --- Model Indicator ---
             gr.Dropdown(
@@ -189,7 +189,7 @@ def build_interface() -> gr.Blocks:
                     # Option B: Upload
                     with gr.Accordion("Option B: Upload Custom Dataset", open=False):
                         gr.Markdown("Upload a CSV file with columns (no header required, or header ignored if present): `Anchor`, `Positive`, `Negative`.")
-                        gr.Markdown("See also: [example_training.dataset.csv](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/example_training.dataset.csv)<br>Example:<br>`MY_FAVORITE_NEWS,Good Title,Bad Title`")
+                        gr.Markdown("See also: [example_training.dataset.csv](https://huggingface.co/spaces/google/embeddinggemma-modkit/blob/main/example_training_dataset.csv)<br>Example:<br>`MY_FAVORITE_NEWS,Good Title,Bad Title`")
                         import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=100)
 
             # --- Step 2: Training ---
@@ -350,7 +350,7 @@ def build_interface() -> gr.Blocks:
                 outputs=[push_status]
             )
 
-        with gr.Tab("📰 Hacker News Similarity Check"):
+        with gr.Tab("📰 Live Ranked Feed"):
             with gr.Column():
                 gr.Markdown(f"## Live Hacker News Feed Vibe")
                 gr.Markdown(f"This feed uses the current model (base or fine-tuned) to score the vibe of live Hacker News stories against **`{AppConfig.QUERY_ANCHOR}`**.")
@@ -358,7 +358,7 @@ def build_interface() -> gr.Blocks:
                 refresh_button = gr.Button("Refresh Feed 🔄", size="lg", variant="primary")
                 refresh_button.click(fn=mood_feed_wrapper, inputs=[session_state], outputs=feed_output)
 
-        with gr.Tab("💡 Similarity Lamp"):
+        with gr.Tab("🧪 Vibe Check Playground"):
             with gr.Column():
                 gr.Markdown(f"## News Similarity Check")
                 gr.Markdown(f"Enter text to see its similarity to **`{AppConfig.QUERY_ANCHOR}`**.\n**Vibe Key:** Green = High, Red = Low")
