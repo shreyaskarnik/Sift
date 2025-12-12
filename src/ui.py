@@ -43,7 +43,7 @@ def update_hub_interactive(app, username: Optional[str] = None):
     is_logged_in = username is not None
     
     # Check if model is ready (app exists and has a dataset generated)
-    has_model_tuned = (app is not None) and (getattr(app, 'last_hn_dataset', None) is not None)
+    has_model_tuned = (app is not None) and app.last_hn_dataset
 
     # Repo input only needs login
     repo_interactive = gr.update(interactive=is_logged_in)
