@@ -321,6 +321,8 @@ def build_interface() -> gr.Blocks:
                 # Lock UI
                 fn=lambda: set_interactivity(False), outputs=action_buttons
             ).then(
+                fn=lambda: gr.update(interactive=False), outputs=push_to_hub_btn
+            ).then(
                 # Reset previous outputs and show "Zipping..."
                 fn=lambda: [gr.update(value=None, visible=False), "⏳ Zipping model..."], 
                 outputs=[model_output, download_status]
@@ -337,6 +339,10 @@ def build_interface() -> gr.Blocks:
             ).then(
                 # Unlock UI
                 fn=lambda: set_interactivity(True), outputs=action_buttons
+            ).then(
+                fn=update_hub_interactive,
+                inputs=[session_state, username_state],
+                outputs=[repo_name_input, push_to_hub_btn]
             )
             
             # 6. Push to Hub
@@ -348,9 +354,19 @@ def build_interface() -> gr.Blocks:
             )
 
             push_to_hub_btn.click(
+                fn=lambda: set_interactivity(False), outputs=action_buttons
+            ).then(
+                fn=lambda: gr.update(interactive=False), outputs=push_to_hub_btn
+            ).then(
                 fn=push_to_hub_wrapper,
                 inputs=[session_state, repo_name_input],
                 outputs=[push_status]
+            ).then(
+                fn=lambda: set_interactivity(True), outputs=action_buttons
+            ).then(
+                fn=update_hub_interactive,
+                inputs=[session_state, username_state],
+                outputs=[repo_name_input, push_to_hub_btn]
             )
 
         with gr.Tab("📰 Live Ranked Feed"):
