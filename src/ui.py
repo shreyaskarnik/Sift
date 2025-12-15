@@ -154,7 +154,7 @@ def build_interface() -> gr.Blocks:
                             for i, title in enumerate(stories[:10]):
                                 with gr.Row(variant="compact", elem_id=f"story_row_{i}"):
                                     # Title
-                                    with gr.Column(scale=3):
+                                    with gr.Column(scale=2):
                                     	gr.Markdown(f"{title}")
                                     
                                     # Radio Selection
