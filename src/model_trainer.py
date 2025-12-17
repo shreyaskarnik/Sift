@@ -89,13 +89,7 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
         )
         tags = info.tags
         tags.append("embeddinggemma-modkit")
-        
-        metadata_update(
-            repo_id=repo_id,
-            {"tags": tags},
-            overwrite=True,
-            token=token
-        )
+        metadata_update(repo_id, {"tags": tags}, overwrite=True, token=token)
         
         return f"✅ Success! Model published at: {url}"
     except Exception as e:
