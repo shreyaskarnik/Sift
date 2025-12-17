@@ -1,4 +1,4 @@
-from huggingface_hub import login, HfApi, ModelCard
+from huggingface_hub import login, HfApi, model_info, metadata_update
 from sentence_transformers import SentenceTransformer, util
 from datasets import Dataset
 from sentence_transformers import SentenceTransformerTrainer, SentenceTransformerTrainingArguments
@@ -83,19 +83,19 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             repo_type="model"
         )
         
-        card_content = f"""
----
-base_model: {AppConfig.MODEL_NAME}
-tags:
-  - sentence-transformers
-  - sentence-similarity
-  - feature-extraction
-  - text-embeddings-inference
-  - embeddinggemma-modkit
----
-A fine-tuned model based on `{AppConfig.MODEL_NAME}`."""
-        card = ModelCard(card_content)
-        card.push_to_hub(repo_id)
+        info = model_info(
+            repo_id=repo_id,
+            token=token
+        )
+        tags = info.tags
+        tags.append("embeddinggemma-modkit")
+        
+        metadata_update(
+            repo_id=repo_id,
+            {"tags": tags},
+            overwrite=True,
+            token=token
+        )
         
         return f"✅ Success! Model published at: {url}"
     except Exception as e:
