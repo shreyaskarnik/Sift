@@ -1,4 +1,4 @@
-from huggingface_hub import login, HfApi # Updated import
+from huggingface_hub import login, HfApi, ModelCard
 from sentence_transformers import SentenceTransformer, util
 from datasets import Dataset
 from sentence_transformers import SentenceTransformerTrainer, SentenceTransformerTrainingArguments
@@ -6,6 +6,7 @@ from sentence_transformers.losses import MultipleNegativesRankingLoss
 from transformers import TrainerCallback, TrainingArguments
 from typing import List, Callable, Optional
 from pathlib import Path
+from .config import AppConfig
 
 # --- Model/Utility Functions ---
 
@@ -81,6 +82,21 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             repo_id=repo_id,
             repo_type="model"
         )
+        
+        card_content = f"""
+---
+base_model: {AppConfig.MODEL_NAME}
+tags:
+  - sentence-transformers
+  - sentence-similarity
+  - feature-extraction
+  - text-embeddings-inference
+  - embeddinggemma-modkit
+---
+A fine-tuned model based on `{AppConfig.MODEL_NAME}`."""
+        card = ModelCard(card_content)
+        card.push_to_hub(repo_id)
+        
         return f"✅ Success! Model published at: {url}"
     except Exception as e:
         print(f"Upload failed: {e}")
