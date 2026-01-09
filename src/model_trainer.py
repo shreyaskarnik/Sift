@@ -88,7 +88,7 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             token=token
         )
         tags = info.card_data.tags
-        tags.append("embeddinggemma-modkit")
+        tags.append("embeddinggemma-tuninglab")
         metadata_update(repo_id, {"tags": tags}, overwrite=True, token=token)
         
         return f"✅ Success! Model published at: {url}"

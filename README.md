@@ -1,5 +1,5 @@
 ---
-title: EmbeddingGemma Modkit
+title: EmbeddingGemma Tuning Lab
 emoji: 😻
 colorFrom: green
 colorTo: indigo
@@ -13,7 +13,7 @@ hf_oauth_scopes:
 license: apache-2.0
 ---
 
-# 🤖 EmbeddingGemma Modkit: Fine-Tuning and Mood Reader
+# 🤖 EmbeddingGemma Tuning Lab: Fine-Tuning and Mood Reader
 
 This project provides a set of tools to fine-tune EmbeddingGemma to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their "vibe."
 
