@@ -4,7 +4,7 @@ from datasets import Dataset
 from sentence_transformers import SentenceTransformerTrainer, SentenceTransformerTrainingArguments
 from sentence_transformers.losses import MultipleNegativesRankingLoss
 from transformers import TrainerCallback, TrainingArguments
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, Union
 from pathlib import Path
 from .config import AppConfig
 
@@ -57,7 +57,22 @@ def get_top_hits(
 
     return "\n".join(result)
 
-def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
+def get_available_namespaces(token: str) -> List[str]:
+    """
+    Returns a list of namespaces (user and organizations) the user can write to.
+    First item is always the authenticated user's username.
+    """
+    try:
+        api = HfApi(token=token)
+        info = api.whoami()
+        username = info['name']
+        orgs = [org['name'] for org in info.get('orgs', [])]
+        return [username] + orgs
+    except Exception as e:
+        print(f"Error fetching namespaces: {e}")
+        return []
+
+def upload_model_to_hub(folder_path: Path, repo_name: str, token: str, entity: Optional[str] = None) -> str:
     """
     Uploads a local model folder to the Hugging Face Hub.
     Creates the repository if it doesn't exist.
@@ -65,12 +80,16 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
     try:
         api = HfApi(token=token)
         
-        # Get the authenticated user's username
-        user_info = api.whoami()
-        username = user_info['name']
+        # Determine the entity (namespace) to use
+        if entity:
+            namespace = entity
+        else:
+            # Fallback to the authenticated user's username
+            user_info = api.whoami()
+            namespace = user_info['name']
         
         # Construct the full repo ID
-        repo_id = f"{username}/{repo_name}"
+        repo_id = f"{namespace}/{repo_name}"
         print(f"Preparing to upload to: {repo_id}")
 
         # Create the repo (safe if it already exists)
@@ -88,8 +107,9 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             token=token
         )
         tags = info.card_data.tags
-        tags.append("embeddinggemma-tuning-lab")
-        metadata_update(repo_id, {"tags": tags}, overwrite=True, token=token)
+        if "embeddinggemma-tuning-lab" not in tags:
+            tags.append("embeddinggemma-tuning-lab")
+            metadata_update(repo_id, {"tags": tags}, overwrite=True, token=token)
         
         return f"✅ Success! Model published at: {url}"
     except Exception as e:

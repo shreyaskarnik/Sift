@@ -4,6 +4,7 @@ from datetime import datetime
 
 from .config import AppConfig
 from .session_manager import HackerNewsFineTuner
+from .model_trainer import get_available_namespaces
 
 # --- Constants for Labels ---
 LABEL_FAV = "👍"
@@ -45,13 +46,27 @@ def on_app_load(app, profile: Optional[gr.OAuthProfile] = None):
     # Return 7 items: App state, Data updates (3), Hub updates (2), Username state (1)
     return app, stories, labels, text_update, repo_update, push_update, username
 
-def update_repo_preview(username, repo_name):
-    """Updates the markdown preview to show 'username/repo_name'."""
-    if not username:
-        return "⚠️ Sign in to see the target repository path."
+def update_repo_preview(entity_name, repo_name):
+    """Updates the markdown preview to show 'entity/repo_name'."""
+    if not entity_name:
+        return "⚠️ Please select a namespace (User or Org)."
     
     clean_repo = repo_name.strip() if repo_name else "..."
-    return f"Target Repository: **`{username}/{clean_repo}`**"
+    return f"Target Repository: **`{entity_name}/{clean_repo}`**"
+
+def fetch_orgs_wrapper(oauth_token: Optional[gr.OAuthToken]):
+    if not oauth_token:
+        return gr.update(choices=[], value=None), "⚠️ Login required to fetch organizations."
+    
+    try:
+        namespaces = get_available_namespaces(oauth_token.token)
+        if not namespaces:
+            return gr.update(choices=[], value=None), "❌ Failed to fetch namespaces."
+        
+        # Default to the first one (username)
+        return gr.update(choices=namespaces, value=namespaces[0]), "✅ Organizations loaded."
+    except Exception as e:
+        return gr.update(choices=[], value=None), f"❌ Error: {str(e)}"
 
 def import_wrapper(app, file):
     return app.import_additional_dataset(file)
@@ -62,11 +77,12 @@ def export_wrapper(app):
 def download_model_wrapper(app):
     return app.download_model()
 
-def push_to_hub_wrapper(app, repo_name, oauth_token: Optional[gr.OAuthToken]):
+def push_to_hub_wrapper(app, entity_name, repo_name, oauth_token: Optional[gr.OAuthToken]):
     if oauth_token is None:
         return "⚠️ You must be logged in to push to the Hub. Please sign in above."
     token_str = oauth_token.token
-    return app.upload_model(repo_name, token_str)
+    # Pass the selected entity
+    return app.upload_model(repo_name, token_str, entity=entity_name)
 
 def training_wrapper(app, stories: List[str], labels: Dict[int, str]):
     """
@@ -126,7 +142,7 @@ def build_interface() -> gr.Blocks:
             with gr.Accordion("0️⃣ Step 0: Sign In (Optional)", open=True):
                 gr.Markdown("Sign in to Hugging Face if you plan to push your fine-tuned model to the Hub later (Step 3).")
                 with gr.Row():
-                    gr.LoginButton(value="Sign in with Hugging Face")
+                    login_btn = gr.LoginButton(value="Sign in with Hugging Face")
                     with gr.Column(scale=3):
                         gr.Markdown("")
             
@@ -200,11 +216,19 @@ def build_interface() -> gr.Blocks:
                 gr.Markdown("Push your fine-tuned model to your personal Hugging Face account.")
                 
                 with gr.Row():
-                    repo_name_input = gr.Textbox(label="Target Repository Name", value="my-embeddinggemma-news-vibe", placeholder="e.g., my-embeddinggemma-news-vibe", interactive=False)
-                    push_to_hub_btn = gr.Button("Save to Hugging Face Hub", variant="secondary", interactive=False)
+                    # Entity (User/Org) Selection
+                    with gr.Column(scale=1):
+                         with gr.Row():
+                            entity_dropdown = gr.Dropdown(label="Owner / Organization", choices=[], interactive=True, scale=4)
+                            refresh_orgs_btn = gr.Button("🔄", scale=1, size="sm")
+
+                    # Repo Name
+                    with gr.Column(scale=2):
+                        repo_name_input = gr.Textbox(label="Target Repository Name", value="my-embeddinggemma-news-vibe", placeholder="e.g., my-embeddinggemma-news-vibe", interactive=False)
+                
+                push_to_hub_btn = gr.Button("Save to Hugging Face Hub", variant="secondary", interactive=False)
                 
                 repo_id_preview = gr.Markdown("Target Repository: (Waiting for input...)")
-                
                 push_status = gr.Markdown("")
 
             # --- Step 4: Downloads ---
@@ -243,14 +267,24 @@ def build_interface() -> gr.Blocks:
                 inputs=[session_state], 
                 outputs=[session_state, stories_state, labels_state, output, repo_name_input, push_to_hub_btn, username_state]
             ).then(
-                fn=update_repo_preview,
-                inputs=[username_state, repo_name_input],
-                outputs=[repo_id_preview]
-            ).then(
                 fn=lambda: [gr.update(interactive=True)]*2, outputs=[clear_reload_btn, run_training_btn]
             )
+
+            # 2. Login Trigger -> Auto Fetch Orgs
+            # ----------------
+            # We can try to fetch orgs automatically if the token is available
             
-            # 2. Reset / Refresh / Clear Selections
+            refresh_orgs_btn.click(
+                fn=fetch_orgs_wrapper,
+                inputs=[login_btn], # Gr.LoginButton acts as the OAuthToken input in this context? No, usually gr.OAuthToken is implicit or separate
+                outputs=[entity_dropdown, push_status]
+            ).then(
+                 fn=update_repo_preview,
+                 inputs=[entity_dropdown, repo_name_input],
+                 outputs=[repo_id_preview]
+            )
+            
+            # 3. Reset / Refresh / Clear Selections
             # ----------------
             clear_reload_btn.click(
                 fn=lambda: set_interactivity(False), outputs=action_buttons
@@ -279,7 +313,7 @@ def build_interface() -> gr.Blocks:
                 outputs=[reset_counter, labels_state]
             )
             
-            # 3. Import Data
+            # 4. Import Data
             # ----------------
             import_file.change(
                 fn=import_wrapper, 
@@ -287,7 +321,7 @@ def build_interface() -> gr.Blocks:
                 outputs=[download_status]
             )
             
-            # 4. Run Training
+            # 5. Run Training
             # ----------------
             run_training_btn.click(
                 fn=lambda: set_interactivity(False), outputs=action_buttons
@@ -304,7 +338,7 @@ def build_interface() -> gr.Blocks:
                 outputs=[repo_name_input, push_to_hub_btn]
             )
             
-            # 5. Downloads
+            # 6. Downloads
             # ----------------
             download_dataset_btn.click(
                 fn=export_wrapper,
@@ -345,11 +379,17 @@ def build_interface() -> gr.Blocks:
                 outputs=[repo_name_input, push_to_hub_btn]
             )
             
-            # 6. Push to Hub
+            # 7. Push to Hub
             # ----------------
+            # Update preview on Name change or Entity change
             repo_name_input.change(
                 fn=update_repo_preview,
-                inputs=[username_state, repo_name_input],
+                inputs=[entity_dropdown, repo_name_input],
+                outputs=[repo_id_preview]
+            )
+            entity_dropdown.change(
+                fn=update_repo_preview,
+                inputs=[entity_dropdown, repo_name_input],
                 outputs=[repo_id_preview]
             )
 
@@ -359,7 +399,7 @@ def build_interface() -> gr.Blocks:
                 fn=lambda: gr.update(interactive=False), outputs=push_to_hub_btn
             ).then(
                 fn=push_to_hub_wrapper,
-                inputs=[session_state, repo_name_input],
+                inputs=[session_state, entity_dropdown, repo_name_input], # Pass entity dropdown
                 outputs=[push_status]
             ).then(
                 fn=lambda: set_interactivity(True), outputs=action_buttons
