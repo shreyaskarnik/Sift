@@ -110,7 +110,7 @@ def build_interface() -> gr.Blocks:
 
         with gr.Column():
             gr.Markdown("# 🤖 EmbeddingGemma Tuning Lab: Fine-Tuning and Mood Reader")
-            gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-tuninglab/blob/main/README.md) for more details.")
+            gr.Markdown("This project provides a set of tools to fine-tune [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m) to understand your personal taste in Hacker News titles and then use it to score and rank new articles based on their \"vibe\". The core idea is to measure the \"vibe\" of a news title by calculating the semantic similarity between its embedding and the embedding of a fixed anchor phrase, **`MY_FAVORITE_NEWS`**.<br>See [README](https://huggingface.co/spaces/google/embeddinggemma-tuning-lab/blob/main/README.md) for more details.")
         
         with gr.Tab("⚙️ Train & Export"):
             
@@ -182,7 +182,7 @@ def build_interface() -> gr.Blocks:
                     # Option B: Upload
                     with gr.Accordion("Option B: Upload Custom Dataset", open=False):
                         gr.Markdown("Upload a CSV file with columns (no header required, or header ignored if present): `Anchor`, `Positive`, `Negative`.")
-                        gr.Markdown("See also: [example_training.dataset.csv](https://huggingface.co/spaces/google/embeddinggemma-tuninglab/blob/main/example_training_dataset.csv)<br>Example:<br>`MY_FAVORITE_NEWS,Good Title,Bad Title`")
+                        gr.Markdown("See also: [example_training.dataset.csv](https://huggingface.co/spaces/google/embeddinggemma-tuning-lab/blob/main/example_training_dataset.csv)<br>Example:<br>`MY_FAVORITE_NEWS,Good Title,Bad Title`")
                         import_file = gr.File(label="Upload Additional Dataset (.csv)", file_types=[".csv"], height=100)
 
             # --- Step 2: Training ---
