@@ -1,5 +1,6 @@
 ---
 title: EmbeddingGemma Tuning Lab
+short_description: Fine-tune EmbeddingGemma to understand your personal taste
 emoji: 😻
 colorFrom: green
 colorTo: indigo
