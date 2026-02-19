@@ -45,6 +45,19 @@ npm run build
 
 Load `chrome-extension/dist/` as an unpacked extension in `chrome://extensions`.
 
+## Publishing Fine-tuned Models
+
+Fine-tuned ONNX model files contain only numerical weights, tokenizer vocabulary, and architecture config — **no training data, user labels, or personal information**. They are safe to publish publicly on HuggingFace Hub, which is the recommended approach for use with the extension.
+
+```bash
+# Push to HuggingFace Hub after training
+python train.py data.csv --push-to-hub your-username/sift-finetuned
+```
+
+Then set the model ID in the extension popup. No authentication is needed for public models.
+
+For private/development models, use the local server instead (`python train.py --serve`).
+
 ## Training Pipeline
 
 Fine-tune EmbeddingGemma on your collected labels, export to ONNX, and quantize for browser inference.

@@ -242,6 +242,11 @@ def main():
         print(result)
 
     print(f"\nTo test locally:\n  python train.py --serve {onnx_output}")
+    print(
+        "\nNote: ONNX model files contain only numerical weights and tokenizer"
+        "\ndata — no training examples or personal information. They are safe"
+        "\nto publish publicly on HuggingFace Hub for use with the extension."
+    )
 
 
 if __name__ == "__main__":
