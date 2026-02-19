@@ -1,0 +1,24 @@
+[project]
+name = "simscore"
+version = "0.1.0"
+description = "Fine-tune EmbeddingGemma for feed scoring — training pipeline for the SimScore Chrome extension"
+requires-python = ">=3.10"
+dependencies = [
+    "sentence-transformers>=3.0",
+    "transformers>=4.56.0",
+    "datasets>=2.18",
+    "accelerate>=0.30",
+    "huggingface-hub>=0.23",
+    "feedparser>=6.0",
+    "optimum>=1.21",
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+]
+
+[project.optional-dependencies]
+quantize = [
+    "onnxconverter-common>=1.14",
+]
+
+[project.scripts]
+simscore-train = "train:main"
