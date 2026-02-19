@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="popup-header">
+    <div class="popup-brand">
+      <h1>SimScore</h1>
+      <span class="version">v0.1</span>
+    </div>
+    <div class="status-pill">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-label" class="status-label">—</span>
+    </div>
+  </header>
+
+  <div class="popup-body">
+    <section id="model-section">
+      <h2>Model</h2>
+      <div id="model-status">Initializing...</div>
+      <div id="progress-bar-container" style="display:none">
+        <div id="progress-bar"></div>
+      </div>
+    </section>
+
+    <section id="settings-section">
+      <h2>Settings</h2>
+      <label>Active Sites</label>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggle-hn" checked><span class="toggle-switch"></span> HN</label>
+        <label class="toggle"><input type="checkbox" id="toggle-reddit" checked><span class="toggle-switch"></span> Reddit</label>
+        <label class="toggle"><input type="checkbox" id="toggle-x" checked><span class="toggle-switch"></span> X</label>
+      </div>
+      <label>Scoring Lens</label>
+      <div class="lens-active" id="lens-active">
+        <span class="lens-icon">◎</span>
+        <span class="lens-text" id="lens-text">News / Social Feed</span>
+        <button class="lens-edit-btn" id="lens-edit-btn" title="Change lens">✎</button>
+      </div>
+      <div class="lens-editor" id="lens-editor" style="display:none">
+        <div class="lens-presets" id="lens-presets">
+          <button class="lens-chip" data-anchor="MY_FAVORITE_NEWS" data-label="News / Social Feed">News / Social Feed</button>
+          <button class="lens-chip" data-anchor="AI_RESEARCH" data-label="AI Research">AI Research</button>
+          <button class="lens-chip" data-anchor="STARTUP_NEWS" data-label="Startups">Startups</button>
+          <button class="lens-chip" data-anchor="DEEP_TECH" data-label="Deep Tech">Deep Tech</button>
+          <button class="lens-chip" data-anchor="SCIENCE_DISCOVERIES" data-label="Science">Science</button>
+        </div>
+        <div class="lens-custom">
+          <span class="lens-custom-label">Custom</span>
+          <div class="input-row">
+            <input type="text" id="anchor-input" placeholder="YOUR_CUSTOM_ANCHOR">
+            <button id="save-anchor">Set</button>
+          </div>
+        </div>
+      </div>
+      <label for="sensitivity-slider">Dimming <span id="sensitivity-value" class="slider-value">50%</span></label>
+      <div class="slider-row">
+        <span class="slider-hint">Subtle</span>
+        <input type="range" id="sensitivity-slider" min="0" max="100" value="50">
+        <span class="slider-hint">Aggressive</span>
+      </div>
+      <label for="model-url-input">Custom Model URL <small>(blank = HuggingFace default)</small></label>
+      <div class="input-row">
+        <input type="text" id="model-url-input" placeholder="http://localhost:8000">
+        <button id="save-model-url">Apply</button>
+      </div>
+    </section>
+
+    <section id="data-section">
+      <h2>Training Data</h2>
+      <div id="label-counts">No labels collected yet.</div>
+      <div class="button-group">
+        <button id="export-csv">Export CSV</button>
+        <label class="file-input-label" for="import-x">
+          Import X Archive
+          <input type="file" id="import-x" accept=".js" multiple style="display:none">
+        </label>
+      </div>
+      <button id="clear-data" class="danger">Clear All Data</button>
+    </section>
+
+    <footer>
+      <p>Scores your feed with EmbeddingGemma, right in the browser.</p>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
