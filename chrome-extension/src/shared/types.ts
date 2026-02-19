@@ -21,6 +21,8 @@ export interface ModelStatus {
   progress?: number;
   message?: string;
   backend?: "webgpu" | "wasm";
+  llmState?: "idle" | "loading" | "ready" | "error";
+  llmMessage?: string;
 }
 
 /** Message envelope for chrome.runtime messaging */
@@ -52,4 +54,10 @@ export interface UpdateAnchorPayload {
 /** Payload for IMPORT_X_LABELS */
 export interface ImportXLabelsPayload {
   labels: TrainingLabel[];
+}
+
+/** Payload for EXPLAIN_SCORE */
+export interface ExplainScorePayload {
+  text: string;
+  score: number;
 }

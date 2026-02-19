@@ -7,7 +7,7 @@ export function createBadge(result: VibeResult): HTMLSpanElement {
 
   const badge = document.createElement("span");
   badge.className = "ss-badge";
-  badge.title = `SimScore: ${result.rawScore.toFixed(4)}`;
+  badge.title = `Sift: ${result.rawScore.toFixed(4)}`;
   badge.style.setProperty("--ss-h", String(hue));
   badge.style.setProperty("--ss-fill", `${Math.round(score * 100)}%`);
 

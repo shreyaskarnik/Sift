@@ -7,7 +7,7 @@
 <body>
   <header class="popup-header">
     <div class="popup-brand">
-      <h1>SimScore</h1>
+      <h1>Sift</h1>
       <span class="version">v0.1</span>
     </div>
     <div class="status-pill">
@@ -18,10 +18,17 @@
 
   <div class="popup-body">
     <section id="model-section">
-      <h2>Model</h2>
-      <div id="model-status">Initializing...</div>
+      <h2>Models</h2>
+      <div class="model-row">
+        <span class="model-name">Scoring</span>
+        <span id="model-status" class="model-detail">Initializing...</span>
+      </div>
       <div id="progress-bar-container" style="display:none">
         <div id="progress-bar"></div>
+      </div>
+      <div class="model-row">
+        <span class="model-name"><label class="toggle toggle-inline"><input type="checkbox" id="toggle-explain" checked><span class="toggle-switch"></span> Explain</label></span>
+        <span id="llm-status" class="model-detail">Waiting...</span>
       </div>
     </section>
 
@@ -82,7 +89,7 @@
     </section>
 
     <footer>
-      <p>Scores your feed with EmbeddingGemma, right in the browser.</p>
+      <p>Sift through the noise — powered by EmbeddingGemma.</p>
     </footer>
   </div>
   <script src="popup.js"></script>

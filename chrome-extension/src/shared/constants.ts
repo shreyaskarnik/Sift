@@ -1,7 +1,10 @@
 // Ported from src/config.py
 
-/** ONNX-quantized model for in-browser inference via Transformers.js */
+/** ONNX-quantized embedding model for scoring via Transformers.js */
 export const MODEL_ID = "onnx-community/embeddinggemma-300m-ONNX";
+
+/** ONNX-quantized text generation model for explanations via Transformers.js */
+export const LLM_MODEL_ID = "onnx-community/gemma-3-270m-it-ONNX";
 
 /** Default anchor phrase for contrastive similarity scoring */
 export const DEFAULT_QUERY_ANCHOR = "MY_FAVORITE_NEWS";
@@ -28,6 +31,9 @@ export const MSG = {
   // Training data
   SAVE_LABEL: "SAVE_LABEL",
 
+  // Explanation (Gemma 3)
+  EXPLAIN_SCORE: "EXPLAIN_SCORE",
+
   // Settings
   UPDATE_ANCHOR: "UPDATE_ANCHOR",
   RELOAD_MODEL: "RELOAD_MODEL",
@@ -46,6 +52,7 @@ export const STORAGE_KEYS = {
   CUSTOM_MODEL_URL: "custom_model_url",
   SENSITIVITY: "score_sensitivity",
   SITE_ENABLED: "site_enabled",
+  EXPLAIN_ENABLED: "explain_enabled",
 } as const;
 
 /** Batch size for content script scoring requests */

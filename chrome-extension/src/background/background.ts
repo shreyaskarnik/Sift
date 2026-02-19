@@ -1,22 +1,26 @@
 /**
  * Service worker — handles model inference directly using Transformers.js v4.
  *
- * Following the HuggingFace browser-extension example pattern:
- * model loads directly in the service worker, no offscreen/sandbox needed.
+ * Loads two models on init:
+ * 1. EmbeddingGemma-300M (q4) — cosine similarity scoring
+ * 2. Gemma 3 270M IT (q4) — "Why this score?" explanations
  */
 import {
   AutoTokenizer,
   AutoModel,
+  pipeline,
   env,
   type PreTrainedTokenizer,
   type PreTrainedModel,
   type ProgressInfo,
+  type TextGenerationPipeline,
 } from "@huggingface/transformers";
 import {
   MSG,
   STORAGE_KEYS,
   DEFAULT_QUERY_ANCHOR,
   MODEL_ID,
+  LLM_MODEL_ID,
   VIBE_THRESHOLDS,
 } from "../shared/constants";
 import type {
@@ -27,6 +31,7 @@ import type {
   UpdateAnchorPayload,
   ImportXLabelsPayload,
   ScoreTextsPayload,
+  ExplainScorePayload,
 } from "../shared/types";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +41,7 @@ import type {
 env.allowLocalModels = false;
 
 // ---------------------------------------------------------------------------
-// State
+// State — Embedding model
 // ---------------------------------------------------------------------------
 
 let tokenizer: PreTrainedTokenizer | null = null;
@@ -45,29 +50,41 @@ let anchorEmbedding: Float32Array | null = null;
 let modelReady = false;
 let anchorReady = false;
 let loadingPromise: Promise<void> | null = null;
-let cachedStatus: ModelStatus = { state: "idle" };
 
 // ---------------------------------------------------------------------------
-// Model loading
+// State — LLM (Gemma 3)
 // ---------------------------------------------------------------------------
 
-function broadcastStatus(status: ModelStatus): void {
-  cachedStatus = status;
-  chrome.runtime.sendMessage({ type: MSG.MODEL_STATUS, payload: status }).catch(() => {});
+let llmPipeline: TextGenerationPipeline | null = null;
+let llmReady = false;
+let llmLoadingPromise: Promise<void> | null = null;
+
+// ---------------------------------------------------------------------------
+// Status
+// ---------------------------------------------------------------------------
+
+let cachedStatus: ModelStatus = { state: "idle", llmState: "idle" };
+
+function broadcastStatus(status: Partial<ModelStatus>): void {
+  cachedStatus = { ...cachedStatus, ...status };
+  chrome.runtime
+    .sendMessage({ type: MSG.MODEL_STATUS, payload: cachedStatus })
+    .catch(() => {});
 }
 
-async function loadModel(): Promise<void> {
+// ---------------------------------------------------------------------------
+// Embedding model loading
+// ---------------------------------------------------------------------------
+
+async function loadEmbeddingModel(): Promise<void> {
   if (modelReady || loadingPromise) return;
 
   loadingPromise = (async () => {
     try {
-      // Check for custom model URL (local testing)
       const stored = await chrome.storage.local.get(STORAGE_KEYS.CUSTOM_MODEL_URL);
       const customUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string | undefined)?.trim();
       const isLocal = !!customUrl;
 
-      // For local: point Transformers.js at the local server, use "local" as model ID
-      // The server handles the HF URL pattern: /{model}/resolve/{revision}/{file}
       const modelId = isLocal ? "local" : MODEL_ID;
       if (isLocal) {
         env.remoteHost = customUrl!;
@@ -82,10 +99,10 @@ async function loadModel(): Promise<void> {
       const dtype = "q4";
       const modelSuffix = hasWebGPU && !isLocal ? "model_no_gather" : "model";
 
-      console.log(`[bg] Loading model ${modelId} from ${isLocal ? customUrl : "HF"} on ${device} (dtype=${dtype})...`);
+      console.log(`[bg] Loading embedding model ${modelId} on ${device} (dtype=${dtype})...`);
       broadcastStatus({
         state: "loading",
-        message: `Loading ${isLocal ? "local" : "HF"} model on ${device}...`,
+        message: `Loading embedding model on ${device}...`,
         backend: device,
       });
 
@@ -118,7 +135,7 @@ async function loadModel(): Promise<void> {
       model = loadedModel;
       modelReady = true;
 
-      console.log(`[bg] Model ready (${device})`);
+      console.log(`[bg] Embedding model ready (${device})`);
       broadcastStatus({ state: "ready", backend: device });
 
       // Embed the anchor phrase
@@ -126,13 +143,106 @@ async function loadModel(): Promise<void> {
       await setAnchor(anchor);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error("[bg] Model load error:", message);
+      console.error("[bg] Embedding model load error:", message);
       broadcastStatus({ state: "error", message });
       loadingPromise = null;
     }
   })();
 
   return loadingPromise;
+}
+
+// ---------------------------------------------------------------------------
+// LLM loading (Gemma 3 270M)
+// ---------------------------------------------------------------------------
+
+async function loadLLM(): Promise<void> {
+  if (llmReady || llmLoadingPromise) return;
+
+  llmLoadingPromise = (async () => {
+    try {
+      // Reset remoteHost to HF for the LLM (custom URL only applies to embedding model)
+      env.remoteHost = "https://huggingface.co";
+
+      const hasWebGPU = !!(navigator as any).gpu;
+      const device = hasWebGPU ? "webgpu" : "wasm";
+
+      console.log(`[bg] Loading LLM ${LLM_MODEL_ID} on ${device}...`);
+      broadcastStatus({ llmState: "loading", llmMessage: "Loading Gemma 3..." });
+
+      llmPipeline = (await pipeline("text-generation", LLM_MODEL_ID, {
+        dtype: "q4",
+        device,
+      })) as TextGenerationPipeline;
+
+      llmReady = true;
+      console.log(`[bg] LLM ready (${device})`);
+      broadcastStatus({ llmState: "ready", llmMessage: "Gemma 3 ready" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[bg] LLM load error:", message);
+      broadcastStatus({ llmState: "error", llmMessage: message });
+      llmLoadingPromise = null;
+    }
+  })();
+
+  return llmLoadingPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Load both models
+// ---------------------------------------------------------------------------
+
+async function loadModels(): Promise<void> {
+  await loadEmbeddingModel();
+  // Load LLM only if explain is enabled
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.EXPLAIN_ENABLED);
+  if (stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false) {
+    loadLLM();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LLM inference — "Why this score?"
+// ---------------------------------------------------------------------------
+
+async function explainScore(text: string, score: number): Promise<string> {
+  if (!llmPipeline) throw new Error("LLM not loaded");
+
+  const anchor = await loadAnchor();
+  const level =
+    score >= 0.8 ? "strong" : score >= 0.5 ? "moderate" : score >= 0.2 ? "weak" : "very weak";
+
+  const messages = [
+    {
+      role: "user",
+      content:
+        `Interest: "${anchor}"\n` +
+        `Title: "${text}"\n` +
+        `Score: ${score.toFixed(2)} (${level})\n\n` +
+        `Why is this title a ${level} match for the interest? One sentence, no bullet points.`,
+    },
+  ];
+
+  const output = await (llmPipeline as any)(messages, {
+    max_new_tokens: 60,
+    do_sample: false,
+  });
+
+  const generated = output[0]?.generated_text;
+  let raw = "";
+  if (Array.isArray(generated)) {
+    const last = generated[generated.length - 1];
+    raw = last?.content || "";
+  } else {
+    raw = String(generated || "");
+  }
+
+  // Clean up: strip markdown artifacts, bullets, excessive whitespace
+  raw = raw.replace(/\*\*/g, "").replace(/^[\s*•\-]+/gm, "").trim();
+  // Take only the first sentence if the model over-generates
+  const firstSentence = raw.match(/^[^.!?]+[.!?]/);
+  return firstSentence ? firstSentence[0].trim() : raw.slice(0, 200);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,12 +358,12 @@ function enqueueLabelWrite(
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("[bg] onInstalled fired");
-  loadModel();
+  loadModels();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   console.log("[bg] onStartup fired");
-  loadModel();
+  loadModels();
 });
 
 // ---------------------------------------------------------------------------
@@ -270,7 +380,7 @@ chrome.runtime.onMessage.addListener(
 
     switch (type) {
       case MSG.INIT_MODEL: {
-        loadModel();
+        loadModels();
         sendResponse({ ok: true });
         return;
       }
@@ -284,11 +394,15 @@ chrome.runtime.onMessage.addListener(
         modelReady = false;
         anchorReady = false;
         loadingPromise = null;
-        cachedStatus = { state: "idle" };
+        // Also reset LLM
+        llmPipeline = null;
+        llmReady = false;
+        llmLoadingPromise = null;
+        cachedStatus = { state: "idle", llmState: "idle" };
         if (prev) {
-          prev.catch(() => {}).then(() => loadModel());
+          prev.catch(() => {}).then(() => loadModels());
         } else {
-          loadModel();
+          loadModels();
         }
         sendResponse({ ok: true });
         return;
@@ -310,8 +424,20 @@ chrome.runtime.onMessage.addListener(
         return true; // keep channel open
       }
 
+      case MSG.EXPLAIN_SCORE: {
+        const p = payload as ExplainScorePayload;
+        if (!llmReady) {
+          sendResponse({ error: "LLM not ready" });
+          return;
+        }
+        explainScore(p.text, p.score)
+          .then((explanation) => sendResponse({ explanation }))
+          .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
       case MSG.GET_STATUS: {
-        sendResponse({ ...cachedStatus, modelReady, hasAnchor: anchorReady });
+        sendResponse({ ...cachedStatus, modelReady, hasAnchor: anchorReady, llmReady });
         return;
       }
 

@@ -9,6 +9,7 @@ const statusLabel = document.getElementById("status-label")!;
 const modelStatus = document.getElementById("model-status")!;
 const progressBarContainer = document.getElementById("progress-bar-container")!;
 const progressBar = document.getElementById("progress-bar")!;
+const llmStatus = document.getElementById("llm-status")!;
 const lensActive = document.getElementById("lens-active")!;
 const lensText = document.getElementById("lens-text")!;
 const lensEditBtn = document.getElementById("lens-edit-btn")!;
@@ -25,6 +26,7 @@ const toggleReddit = document.getElementById("toggle-reddit") as HTMLInputElemen
 const toggleX = document.getElementById("toggle-x") as HTMLInputElement;
 const sensitivitySlider = document.getElementById("sensitivity-slider") as HTMLInputElement;
 const sensitivityValue = document.getElementById("sensitivity-value")!;
+const toggleExplain = document.getElementById("toggle-explain") as HTMLInputElement;
 const modelUrlInput = document.getElementById("model-url-input") as HTMLInputElement;
 const saveModelUrlBtn = document.getElementById("save-model-url")!;
 
@@ -36,6 +38,7 @@ async function init() {
     STORAGE_KEYS.CUSTOM_MODEL_URL,
     STORAGE_KEYS.SENSITIVITY,
     STORAGE_KEYS.SITE_ENABLED,
+    STORAGE_KEYS.EXPLAIN_ENABLED,
   ]);
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
@@ -48,6 +51,7 @@ async function init() {
   toggleHN.checked = sites.hn !== false;
   toggleReddit.checked = sites.reddit !== false;
   toggleX.checked = sites.x !== false;
+  toggleExplain.checked = stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false;
 
   // Get model status
   try {
@@ -64,6 +68,7 @@ async function init() {
 function updateModelStatus(status: ModelStatus) {
   statusDot.className = "status-dot " + status.state;
 
+  // Embedding model status
   if (status.state === "loading") {
     statusLabel.textContent = "Loading";
     modelStatus.textContent = status.message || "Loading model...";
@@ -83,6 +88,19 @@ function updateModelStatus(status: ModelStatus) {
   } else {
     statusLabel.textContent = "—";
     modelStatus.textContent = "Initializing...";
+  }
+
+  // LLM status
+  if (!toggleExplain.checked) {
+    llmStatus.textContent = "Off";
+  } else if (status.llmState === "loading") {
+    llmStatus.textContent = status.llmMessage || "Loading Gemma 3...";
+  } else if (status.llmState === "ready") {
+    llmStatus.textContent = "Ready";
+  } else if (status.llmState === "error") {
+    llmStatus.textContent = `Error: ${status.llmMessage}`;
+  } else {
+    llmStatus.textContent = "Waiting...";
   }
 }
 
@@ -176,6 +194,16 @@ toggleHN.addEventListener("change", saveSiteToggles);
 toggleReddit.addEventListener("change", saveSiteToggles);
 toggleX.addEventListener("change", saveSiteToggles);
 
+toggleExplain.addEventListener("change", async () => {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.EXPLAIN_ENABLED]: toggleExplain.checked,
+  });
+  if (toggleExplain.checked) {
+    // Trigger LLM load
+    await chrome.runtime.sendMessage({ type: MSG.RELOAD_MODEL });
+  }
+});
+
 sensitivitySlider.addEventListener("input", () => {
   const val = Number(sensitivitySlider.value);
   sensitivityValue.textContent = `${val}%`;
@@ -209,7 +237,7 @@ exportCsvBtn.addEventListener("click", async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `simscore_training_${Date.now()}.csv`;
+    a.download = `sift_training_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {

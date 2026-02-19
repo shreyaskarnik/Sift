@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Fine-tune EmbeddingGemma on SimScore CSV training data, then convert to ONNX.
+Fine-tune EmbeddingGemma on Sift CSV training data, then convert to ONNX.
 
 Usage:
-  python train.py path/to/simscore_training.csv
-  python train.py path/to/simscore_training.csv --epochs 6 --lr 3e-5
+  python train.py path/to/sift_training.csv
+  python train.py path/to/sift_training.csv --epochs 6 --lr 3e-5
   python train.py --convert-only path/to/saved_model
   python train.py --serve path/to/onnx_model
 """
@@ -172,7 +172,7 @@ def serve_model(model_dir: Path, port: int = 8000):
 
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune EmbeddingGemma + convert to ONNX")
-    parser.add_argument("csv_path", nargs="?", help="Path to SimScore training CSV")
+    parser.add_argument("csv_path", nargs="?", help="Path to Sift training CSV")
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--output", type=str, default=None)
@@ -212,7 +212,7 @@ def main():
     model = SentenceTransformer(AppConfig.MODEL_NAME, model_kwargs={"device_map": "auto"})
     print(f"Model loaded on {model.device}")
 
-    output_dir = Path(args.output) if args.output else AppConfig.ARTIFACTS_DIR / "simscore-finetuned"
+    output_dir = Path(args.output) if args.output else AppConfig.ARTIFACTS_DIR / "sift-finetuned"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     all_titles = list(set([t[1] for t in triplets] + [t[2] for t in triplets]))

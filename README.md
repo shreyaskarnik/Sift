@@ -1,8 +1,13 @@
-# SimScore
+# Sift
 
-Score your feed with EmbeddingGemma, right in the browser.
+Sift through the noise. Score your feed with EmbeddingGemma, right in the browser.
 
-SimScore is a Chrome extension that runs [EmbeddingGemma-300M](https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX) (q4 quantized) directly in the browser via Transformers.js + WebGPU. It scores content on Hacker News, Reddit, and X against a configurable anchor phrase using cosine similarity, and dims low-relevance items so the good stuff stands out.
+Sift is a Chrome extension that runs two models directly in the browser via Transformers.js + WebGPU:
+
+- [EmbeddingGemma-300M](https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX) (q4) — scores content against your interests using cosine similarity
+- [Gemma 3 270M IT](https://huggingface.co/onnx-community/gemma-3-270m-it-ONNX) (q4) — explains why items scored high or low
+
+It works on Hacker News, Reddit, and X — dimming low-relevance items so the good stuff stands out.
 
 Users can label items (thumbs up/down) to collect training data, export it as CSV, and fine-tune the model with the included Python pipeline.
 
@@ -21,6 +26,7 @@ Chrome MV3 extension in `chrome-extension/`. Runs entirely client-side — no se
 ### Features
 
 - EmbeddingGemma-300M (q4) inference via WebGPU with WASM fallback
+- Gemma 3 270M IT (q4) "Why this score?" explanations
 - Scores HN, Reddit, and X feeds with ambient opacity dimming
 - Per-site toggles and sensitivity slider
 - Scoring lens presets (News, AI Research, Startups, Deep Tech, Science)
@@ -53,7 +59,7 @@ uv pip install ".[quantize]"
 
 ```bash
 # Fine-tune on exported CSV
-python train.py path/to/simscore_training.csv
+python train.py path/to/sift_training.csv
 
 # With custom hyperparams
 python train.py data.csv --epochs 6 --lr 3e-5
@@ -81,13 +87,13 @@ MY_FAVORITE_NEWS,"Rust is eating the world","Bitcoin drops 10%"
 
 ```
 Content Scripts ──chrome.runtime.sendMessage──▸ Background Service Worker
-    (IIFE)            (SCORE_TEXTS)                (ES module)
+    (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                        │
 Popup ──────────chrome.runtime.sendMessage─────────────┘
     (IIFE)         (GET_STATUS, UPDATE_ANCHOR)
 ```
 
-- **Background** — Loads model via Transformers.js, manages anchor embedding, routes messages, stores labels
+- **Background** — Loads EmbeddingGemma + Gemma 3 via Transformers.js, manages scoring + explanations, routes messages, stores labels
 - **Content scripts** — Site-specific DOM selectors, MutationObserver for infinite scroll, debounced scoring
 - **Popup** — Settings, lens picker, sensitivity slider, data export
 

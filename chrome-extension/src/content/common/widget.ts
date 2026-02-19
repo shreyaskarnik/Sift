@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "../../shared/constants";
+import { MSG, STORAGE_KEYS } from "../../shared/constants";
 import type { VibeResult } from "../../shared/types";
 import { injectStyles } from "./styles";
 import { createLabelButtons } from "./label-buttons";
@@ -9,21 +9,41 @@ let siteEnabled: Record<string, boolean> = { hn: true, reddit: true, x: true };
 /** Sensitivity 0-100. Cached, updated via storage listener. */
 let sensitivity = 50;
 
+/** Whether the explain ("?") feature is enabled. */
+let explainEnabled = true;
+
 /** Load settings from storage. Call once before scoring. */
 export async function loadSettings(): Promise<void> {
   try {
     const stored = await chrome.storage.local.get([
       STORAGE_KEYS.SENSITIVITY,
       STORAGE_KEYS.SITE_ENABLED,
+      STORAGE_KEYS.EXPLAIN_ENABLED,
     ]);
     sensitivity = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
     siteEnabled = stored[STORAGE_KEYS.SITE_ENABLED] ?? { hn: true, reddit: true, x: true };
+    explainEnabled = stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false;
   } catch { /* use default */ }
 }
 
 /** Check if a site is currently enabled. */
 export function isSiteEnabled(site: "hn" | "reddit" | "x"): boolean {
   return siteEnabled[site] !== false;
+}
+
+/**
+ * Register a callback that fires when the background model becomes ready.
+ * Useful for re-processing items that failed initial scoring.
+ */
+export function onModelReady(callback: () => void): void {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (
+      message.type === "MODEL_STATUS" &&
+      message.payload?.state === "ready"
+    ) {
+      callback();
+    }
+  });
 }
 
 // Live-update when user changes settings in the popup
@@ -33,6 +53,9 @@ chrome.storage.onChanged.addListener((changes) => {
   }
   if (changes[STORAGE_KEYS.SITE_ENABLED]) {
     siteEnabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue ?? { hn: true, reddit: true, x: true };
+  }
+  if (changes[STORAGE_KEYS.EXPLAIN_ENABLED]) {
+    explainEnabled = changes[STORAGE_KEYS.EXPLAIN_ENABLED].newValue !== false;
   }
 });
 
@@ -51,11 +74,76 @@ function computeOpacity(score: number): number {
   return Math.max(0.15, Math.min(1.0, raw));
 }
 
+/** Track the active tooltip so only one shows at a time */
+let activeTip: HTMLElement | null = null;
+
 /**
- * Apply SimScore ambient styling to an existing page element.
+ * Create the "Why?" explain button. Sends EXPLAIN_SCORE to background
+ * and shows the response in a fixed-position tooltip near the button.
+ */
+function createExplainButton(text: string, score: number): HTMLSpanElement {
+  const btn = document.createElement("span");
+  btn.className = "ss-vote ss-explain-btn";
+  btn.textContent = "?";
+  btn.title = "Why this score?";
+
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Dismiss existing tooltip
+    if (activeTip) {
+      activeTip.remove();
+      activeTip = null;
+    }
+
+    // Position relative to the button
+    const rect = btn.getBoundingClientRect();
+
+    const tip = document.createElement("div");
+    tip.className = "ss-explain-tip";
+    tip.textContent = "Thinking\u2026";
+    tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    tip.style.left = `${rect.left + window.scrollX}px`;
+    document.body.appendChild(tip);
+    activeTip = tip;
+
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: MSG.EXPLAIN_SCORE,
+        payload: { text, score },
+      });
+      if (!document.body.contains(tip)) return; // dismissed while loading
+      if (resp?.error) {
+        tip.textContent = resp.error;
+      } else {
+        tip.textContent = resp?.explanation || "No explanation available.";
+      }
+    } catch {
+      if (document.body.contains(tip)) {
+        tip.textContent = "LLM not available.";
+      }
+    }
+
+    // Dismiss on click outside
+    const dismiss = (ev: MouseEvent) => {
+      if (!tip.contains(ev.target as Node) && ev.target !== btn) {
+        tip.remove();
+        if (activeTip === tip) activeTip = null;
+        document.removeEventListener("click", dismiss, true);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", dismiss, true), 0);
+  });
+
+  return btn;
+}
+
+/**
+ * Apply Sift ambient styling to an existing page element.
  * - Colored left bar (red → green proportional to score)
  * - Dims low-scoring items based on sensitivity setting
- * - Vote buttons appear on hover (if source provided)
+ * - Vote buttons + explain button appear on hover (if source provided)
  */
 export function applyScore(
   result: VibeResult,
@@ -78,6 +166,10 @@ export function applyScore(
 
   if (source) {
     const anchor = voteAnchor || el;
-    anchor.appendChild(createLabelButtons(result.text, source));
+    const buttons = createLabelButtons(result.text, source);
+    if (explainEnabled) {
+      buttons.appendChild(createExplainButton(result.text, score));
+    }
+    anchor.appendChild(buttons);
   }
 }

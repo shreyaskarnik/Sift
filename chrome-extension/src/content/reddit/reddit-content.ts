@@ -1,5 +1,5 @@
 import { scoreTexts } from "../common/batch-scorer";
-import { applyScore, loadSettings, isSiteEnabled } from "../common/widget";
+import { applyScore, loadSettings, isSiteEnabled, onModelReady } from "../common/widget";
 
 function getTitleElements(): { el: Element; text: string }[] {
   const items: { el: Element; text: string }[] = [];
@@ -7,7 +7,7 @@ function getTitleElements(): { el: Element; text: string }[] {
   // New Reddit (shreddit web components)
   document.querySelectorAll("shreddit-post").forEach((post) => {
     const title = post.getAttribute("post-title");
-    if (title && !post.getAttribute("data-simscore")) {
+    if (title && post.getAttribute("data-sift") !== "done") {
       items.push({ el: post, text: title });
     }
   });
@@ -16,7 +16,7 @@ function getTitleElements(): { el: Element; text: string }[] {
   if (items.length === 0) {
     document.querySelectorAll<HTMLAnchorElement>("a.title").forEach((el) => {
       const text = el.textContent?.trim();
-      if (text && !el.dataset.simscore) {
+      if (text && el.dataset.sift !== "done") {
         items.push({ el, text });
       }
     });
@@ -27,7 +27,7 @@ function getTitleElements(): { el: Element; text: string }[] {
     document.querySelectorAll("a[data-click-id='body'] h3").forEach((h3) => {
       const text = h3.textContent?.trim();
       const parent = h3.closest("a");
-      if (text && parent && !parent.dataset.simscore) {
+      if (text && parent && (parent as HTMLElement).dataset.sift !== "done") {
         items.push({ el: parent, text });
       }
     });
@@ -42,30 +42,39 @@ async function processReddit() {
   const items = getTitleElements();
   if (items.length === 0) return;
 
+  // Mark pending
   items.forEach(({ el }) => {
-    if (el instanceof HTMLElement) el.dataset.simscore = "pending";
-    else el.setAttribute("data-simscore", "pending");
+    if (el instanceof HTMLElement) el.dataset.sift = "pending";
+    else el.setAttribute("data-sift", "pending");
   });
 
-  const texts = items.map((i) => i.text);
-  const results = await scoreTexts(texts);
+  try {
+    const texts = items.map((i) => i.text);
+    const results = await scoreTexts(texts);
 
-  results.forEach((result, i) => {
-    const { el } = items[i];
-    if (el instanceof HTMLElement) el.dataset.simscore = "done";
-    else el.setAttribute("data-simscore", "done");
+    results.forEach((result, i) => {
+      const { el } = items[i];
+      if (el instanceof HTMLElement) el.dataset.sift = "done";
+      else el.setAttribute("data-sift", "done");
 
-    const htmlEl = el as HTMLElement;
+      const htmlEl = el as HTMLElement;
 
-    if (el.tagName === "SHREDDIT-POST") {
-      const titleSlot =
-        el.querySelector('[slot="title"]') ||
-        el.querySelector("a[slot='full-post-link']");
-      applyScore(result, htmlEl, (titleSlot || htmlEl) as HTMLElement, "reddit");
-    } else {
-      applyScore(result, htmlEl, htmlEl, "reddit");
-    }
-  });
+      if (el.tagName === "SHREDDIT-POST") {
+        const titleSlot =
+          el.querySelector('[slot="title"]') ||
+          el.querySelector("a[slot='full-post-link']");
+        applyScore(result, htmlEl, (titleSlot || htmlEl) as HTMLElement, "reddit");
+      } else {
+        applyScore(result, htmlEl, htmlEl, "reddit");
+      }
+    });
+  } catch {
+    // Reset so items can be retried
+    items.forEach(({ el }) => {
+      if (el instanceof HTMLElement) delete el.dataset.sift;
+      else el.removeAttribute("data-sift");
+    });
+  }
 }
 
 // Debounced MutationObserver
@@ -80,4 +89,5 @@ const observer = new MutationObserver(() => {
   await loadSettings();
   processReddit();
   observer.observe(document.body, { childList: true, subtree: true });
+  onModelReady(() => processReddit());
 })();
