@@ -19,6 +19,34 @@ const CSS = /* css */ `
    Prefix: ss-  ·  Zero global leaks
    ═══════════════════════════════════════════ */
 
+/* ── Pending state while inference is running ── */
+.ss-pending {
+  position: relative;
+  opacity: 0.72;
+}
+
+.ss-pending::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsla(var(--ss-h, 55), 75%, 50%, 0.9) 50%,
+    transparent 100%
+  );
+  animation: ss-pending-sweep 1.15s linear infinite;
+}
+
+@keyframes ss-pending-sweep {
+  from { transform: translateX(-28%); opacity: 0.4; }
+  to { transform: translateX(28%); opacity: 1; }
+}
+
 /* ── Score indicator — applied to title container ── */
 .ss-scored {
   border-left: 2px solid hsl(var(--ss-h, 60), 65%, 45%);
@@ -147,7 +175,7 @@ const CSS = /* css */ `
   position: absolute;
   z-index: 2147483647;
   max-width: 360px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   background: #1c1c1f;
   color: #d8d8dc;
   font: 12px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
@@ -172,9 +200,45 @@ const CSS = /* css */ `
   transform: rotate(45deg);
 }
 
+.ss-inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.ss-inspector-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #f2f2f4;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ss-inspector-pill.ss-inspector-band {
+  color: #cfe6ff;
+  background: rgba(66, 153, 225, 0.18);
+  border-color: rgba(66, 153, 225, 0.34);
+}
+
+.ss-inspector-body {
+  white-space: normal;
+}
+
 /* Thinking pulse */
 .ss-explain-tip.ss-thinking {
-  animation: ss-tip-in 0.18s ease-out, ss-think-pulse 1.8s ease-in-out 0.2s infinite;
+  animation: ss-tip-in 0.18s ease-out;
+}
+
+.ss-explain-tip.ss-thinking .ss-inspector-body {
+  animation: ss-think-pulse 1.8s ease-in-out 0.2s infinite;
 }
 
 @keyframes ss-tip-in {
@@ -209,6 +273,9 @@ const CSS = /* css */ `
     background: #2a2a2e;
     border-top-color: rgba(255, 255, 255, 0.12);
     border-left-color: rgba(255, 255, 255, 0.12);
+  }
+  .ss-inspector-pill {
+    border-color: rgba(255, 255, 255, 0.24);
   }
 }
 `;

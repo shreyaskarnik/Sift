@@ -1,4 +1,4 @@
-import { MSG, STORAGE_KEYS } from "../../shared/constants";
+import { MSG, STORAGE_KEYS, VIBE_THRESHOLDS } from "../../shared/constants";
 import type { VibeResult } from "../../shared/types";
 import { injectStyles } from "./styles";
 import { createLabelButtons } from "./label-buttons";
@@ -59,12 +59,20 @@ try {
 chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.SENSITIVITY]) {
     sensitivity = changes[STORAGE_KEYS.SENSITIVITY].newValue ?? 50;
+    applySensitivityToExistingScores();
   }
   if (changes[STORAGE_KEYS.SITE_ENABLED]) {
     siteEnabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue ?? { hn: true, reddit: true, x: true };
   }
   if (changes[STORAGE_KEYS.EXPLAIN_ENABLED]) {
     explainEnabled = changes[STORAGE_KEYS.EXPLAIN_ENABLED].newValue !== false;
+    if (!explainEnabled) {
+      document.querySelectorAll(".ss-explain-btn").forEach((el) => el.remove());
+      if (activeTip) {
+        activeTip.remove();
+        activeTip = null;
+      }
+    }
   }
 });
 
@@ -83,8 +91,27 @@ function computeOpacity(score: number): number {
   return Math.max(0.15, Math.min(1.0, raw));
 }
 
+function applySensitivityToExistingScores(): void {
+  document.querySelectorAll<HTMLElement>(".ss-scored").forEach((el) => {
+    const score = Number(el.dataset.siftScore);
+    if (!Number.isFinite(score)) return;
+    const opacity = computeOpacity(Math.max(0, Math.min(1, score)));
+    el.style.setProperty("--ss-opacity", String(opacity));
+  });
+}
+
 /** Track the active tooltip so only one shows at a time */
 let activeTip: HTMLElement | null = null;
+
+function getScoreBand(score: number): string {
+  const clamped = Math.max(0, Math.min(1, score));
+  for (const threshold of VIBE_THRESHOLDS) {
+    if (clamped >= threshold.score) {
+      return threshold.status.replace("VIBE:", "");
+    }
+  }
+  return "LOW";
+}
 
 /**
  * Create the "Why?" explain button. Sends EXPLAIN_SCORE to background
@@ -111,7 +138,24 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
 
     const tip = document.createElement("div");
     tip.className = "ss-explain-tip ss-thinking";
-    tip.textContent = "Thinking\u2026";
+
+    const header = document.createElement("div");
+    header.className = "ss-inspector-head";
+
+    const scorePill = document.createElement("span");
+    scorePill.className = "ss-inspector-pill";
+    scorePill.textContent = `${Math.round(score * 100)}%`;
+
+    const bandPill = document.createElement("span");
+    bandPill.className = "ss-inspector-pill ss-inspector-band";
+    bandPill.textContent = getScoreBand(score);
+
+    const body = document.createElement("div");
+    body.className = "ss-inspector-body";
+    body.textContent = "Thinking\u2026";
+
+    header.append(scorePill, bandPill);
+    tip.append(header, body);
     tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
     tip.style.left = `${rect.left + window.scrollX}px`;
     document.body.appendChild(tip);
@@ -125,14 +169,14 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
       if (!document.body.contains(tip)) return; // dismissed while loading
       tip.classList.remove("ss-thinking");
       if (resp?.error) {
-        tip.textContent = resp.error;
+        body.textContent = resp.error;
       } else {
-        tip.textContent = resp?.explanation || "No explanation available.";
+        body.textContent = resp?.explanation || "No explanation available.";
       }
     } catch {
       if (document.body.contains(tip)) {
         tip.classList.remove("ss-thinking");
-        tip.textContent = "LLM not available.";
+        body.textContent = "LLM not available.";
       }
     }
 
@@ -168,12 +212,14 @@ export function applyScore(
   const hue = Math.floor(score * 120); // 0 red → 60 amber → 120 green
   const opacity = computeOpacity(score);
 
-  // Guard: only apply once per element
+  el.style.setProperty("--ss-h", String(hue));
+  el.style.setProperty("--ss-opacity", String(opacity));
+  el.dataset.siftScore = String(score);
+
+  // Guard: only create controls once per element
   if (el.classList.contains("ss-scored")) return;
 
   el.classList.add("ss-scored");
-  el.style.setProperty("--ss-h", String(hue));
-  el.style.setProperty("--ss-opacity", String(opacity));
 
   if (source) {
     const anchor = voteAnchor || el;
@@ -183,4 +229,27 @@ export function applyScore(
     }
     anchor.appendChild(buttons);
   }
+}
+
+export function clearAppliedScores(): void {
+  document.querySelectorAll<HTMLElement>(".ss-scored").forEach((el) => {
+    el.classList.remove("ss-scored");
+    el.style.removeProperty("--ss-h");
+    el.style.removeProperty("--ss-opacity");
+    delete el.dataset.siftScore;
+  });
+
+  document.querySelectorAll(".ss-votes").forEach((el) => el.remove());
+
+  if (activeTip) {
+    activeTip.remove();
+    activeTip = null;
+  }
+}
+
+export function resetSiftMarkers(): void {
+  document.querySelectorAll<HTMLElement>("[data-sift]").forEach((el) => {
+    delete el.dataset.sift;
+    el.classList.remove("ss-pending");
+  });
 }

@@ -52,8 +52,18 @@ export interface UpdateAnchorPayload {
   anchor: string;
 }
 
+/** Payload for SET_EXPLAIN_ENABLED */
+export interface SetExplainEnabledPayload {
+  enabled: boolean;
+}
+
 /** Payload for IMPORT_X_LABELS */
 export interface ImportXLabelsPayload {
+  labels: TrainingLabel[];
+}
+
+/** Payload for SET_LABELS */
+export interface SetLabelsPayload {
   labels: TrainingLabel[];
 }
 

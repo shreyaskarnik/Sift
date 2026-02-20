@@ -513,6 +513,17 @@ button:hover {
   color: var(--text);
 }
 
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
 button:active {
   transform: scale(0.97);
 }
@@ -573,6 +584,97 @@ button.danger:hover {
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+.data-readiness {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+
+.data-readiness.ready {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-dim);
+}
+
+.collect-link {
+  display: none;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.collect-link.visible {
+  display: inline-flex;
+}
+
+.collect-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Toasts ── */
+
+.toast-container {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 11px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast.success {
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.toast.error {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.toast-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.toast-action:hover {
+  text-decoration: underline;
+  background: transparent;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Footer ── */

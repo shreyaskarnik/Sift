@@ -10,17 +10,7 @@ export function exportToCSV(labels: TrainingLabel[], anchor: string): string {
   const negatives = labels.filter((l) => l.label === "negative").map((l) => l.text);
 
   if (positives.length === 0 || negatives.length === 0) {
-    // Need at least one of each for triplets
-    // If only positives (e.g. X archive), create a simple CSV with just positives
-    const rows = ["Anchor,Positive,Negative"];
-    // Can't create proper triplets without both, return what we can
-    if (positives.length > 0 && negatives.length === 0) {
-      // Use a placeholder negative
-      for (const p of positives) {
-        rows.push(`${csvEscape(anchor)},${csvEscape(p)},`);
-      }
-    }
-    return rows.join("\n") + "\n";
+    throw new Error("Need at least one positive and one negative label to export triplets.");
   }
 
   const rows = ["Anchor,Positive,Negative"];

@@ -25,14 +25,34 @@ from src.config import AppConfig
 def load_csv(path: str) -> list[list[str]]:
     """Load Anchor,Positive,Negative triplets from CSV."""
     triplets = []
-    with open(path) as f:
+    with open(path, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
-        header = next(reader)
-        if header[0].strip().lower() != "anchor":
-            triplets.append(header)
+
+        try:
+            first_row = next(reader)
+        except StopIteration:
+            return triplets
+
+        def maybe_append_triplet(row: list[str]) -> None:
+            if len(row) < 3:
+                return
+            anchor = row[0].strip()
+            positive = row[1].strip()
+            negative = row[2].strip()
+            if anchor and positive and negative:
+                triplets.append([anchor, positive, negative])
+
+        is_header = (
+            len(first_row) >= 3
+            and first_row[0].strip().lower() == "anchor"
+            and first_row[1].strip().lower() == "positive"
+            and first_row[2].strip().lower() == "negative"
+        )
+        if not is_header:
+            maybe_append_triplet(first_row)
+
         for row in reader:
-            if len(row) >= 3 and row[1].strip() and row[2].strip():
-                triplets.append([row[0].strip(), row[1].strip(), row[2].strip()])
+            maybe_append_triplet(row)
     return triplets
 
 
@@ -133,7 +153,6 @@ def serve_model(model_dir: Path, port: int = 8000):
     and use model_id = "local".
     """
     import http.server
-    import posixpath
 
     model_dir_abs = str(model_dir.resolve())
 
@@ -186,6 +205,11 @@ def main():
                         help="Port for --serve (default: 8000)")
     args = parser.parse_args()
 
+    if args.epochs <= 0:
+        parser.error("--epochs must be >= 1")
+    if args.lr <= 0:
+        parser.error("--lr must be > 0")
+
     # --- Serve mode ---
     if args.serve:
         serve_model(Path(args.serve), port=args.port)
@@ -207,7 +231,10 @@ def main():
     triplets = load_csv(args.csv_path)
     print(f"Loaded {len(triplets)} training triplets from {args.csv_path}")
     if len(triplets) < 2:
-        print("Need at least 2 triplets to train. Collect more labels!")
+        print(
+            "Need at least 2 valid triplets (Anchor,Positive,Negative with non-empty values). "
+            "Collect more labels!"
+        )
         sys.exit(1)
 
     print(f"Loading base model: {AppConfig.MODEL_NAME}")
@@ -225,7 +252,16 @@ def main():
     print(f"\n--- Before training ---")
     print(search_fn())
 
-    train_with_dataset(model, triplets, output_dir, AppConfig.TASK_NAME, search_fn)
+    print(f"\nTraining with epochs={args.epochs}, lr={args.lr}...")
+    train_with_dataset(
+        model,
+        triplets,
+        output_dir,
+        AppConfig.TASK_NAME,
+        search_fn,
+        epochs=args.epochs,
+        learning_rate=args.lr,
+    )
 
     print(f"\n--- After training ---")
     print(search_fn())

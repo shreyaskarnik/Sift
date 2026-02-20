@@ -18,9 +18,11 @@ const lensPresets = document.getElementById("lens-presets")!;
 const anchorInput = document.getElementById("anchor-input") as HTMLInputElement;
 const saveAnchorBtn = document.getElementById("save-anchor")!;
 const labelCounts = document.getElementById("label-counts")!;
-const exportCsvBtn = document.getElementById("export-csv")!;
+const dataReadiness = document.getElementById("data-readiness")!;
+const collectLink = document.getElementById("collect-link") as HTMLAnchorElement;
+const exportCsvBtn = document.getElementById("export-csv") as HTMLButtonElement;
 const importXInput = document.getElementById("import-x") as HTMLInputElement;
-const clearDataBtn = document.getElementById("clear-data")!;
+const clearDataBtn = document.getElementById("clear-data") as HTMLButtonElement;
 const toggleHN = document.getElementById("toggle-hn") as HTMLInputElement;
 const toggleReddit = document.getElementById("toggle-reddit") as HTMLInputElement;
 const toggleX = document.getElementById("toggle-x") as HTMLInputElement;
@@ -28,8 +30,122 @@ const sensitivitySlider = document.getElementById("sensitivity-slider") as HTMLI
 const sensitivityValue = document.getElementById("sensitivity-value")!;
 const toggleExplain = document.getElementById("toggle-explain") as HTMLInputElement;
 const modelSourceInput = document.getElementById("model-source-input") as HTMLInputElement;
-const saveModelSourceBtn = document.getElementById("save-model-source")!;
+const saveModelSourceBtn = document.getElementById("save-model-source") as HTMLButtonElement;
 const modelIdDisplay = document.getElementById("model-id-display")!;
+const toastContainer = document.getElementById("toast-container")!;
+
+interface LabelStats {
+  total: number;
+  pos: number;
+  neg: number;
+  hn: number;
+  reddit: number;
+  x: number;
+  xImport: number;
+}
+
+const EMPTY_STATS: LabelStats = {
+  total: 0,
+  pos: 0,
+  neg: 0,
+  hn: 0,
+  reddit: 0,
+  x: 0,
+  xImport: 0,
+};
+
+let lastLabelStats: LabelStats = EMPTY_STATS;
+
+type ToastType = "info" | "success" | "error";
+
+interface ToastOptions {
+  type?: ToastType;
+  durationMs?: number;
+  actionLabel?: string;
+  onAction?: () => void | Promise<void>;
+}
+
+function showToast(message: string, options: ToastOptions = {}): void {
+  const { type = "info", durationMs = 4000, actionLabel, onAction } = options;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+
+  const text = document.createElement("span");
+  text.textContent = message;
+  toast.appendChild(text);
+
+  if (actionLabel && onAction) {
+    const action = document.createElement("button");
+    action.className = "toast-action";
+    action.type = "button";
+    action.textContent = actionLabel;
+    action.addEventListener("click", async () => {
+      try {
+        await onAction();
+      } catch (err) {
+        showToast(`Action failed: ${String(err)}`, { type: "error" });
+      } finally {
+        toast.remove();
+      }
+    });
+    toast.appendChild(action);
+  }
+
+  toastContainer.appendChild(toast);
+  window.setTimeout(() => toast.remove(), durationMs);
+}
+
+function summarizeLabels(labels: TrainingLabel[]): LabelStats {
+  return {
+    total: labels.length,
+    pos: labels.filter((l) => l.label === "positive").length,
+    neg: labels.filter((l) => l.label === "negative").length,
+    hn: labels.filter((l) => l.source === "hn").length,
+    reddit: labels.filter((l) => l.source === "reddit").length,
+    x: labels.filter((l) => l.source === "x").length,
+    xImport: labels.filter((l) => l.source === "x-import").length,
+  };
+}
+
+function getCollectionUrl(): string | null {
+  if (toggleHN.checked) return "https://news.ycombinator.com/";
+  if (toggleReddit.checked) return "https://www.reddit.com/";
+  if (toggleX.checked) return "https://x.com/home";
+  return null;
+}
+
+function updateDataReadiness(stats: LabelStats): void {
+  const ready = stats.pos > 0 && stats.neg > 0;
+  exportCsvBtn.disabled = !ready;
+
+  if (ready) {
+    const rows = Math.max(stats.pos, stats.neg);
+    dataReadiness.className = "data-readiness ready";
+    dataReadiness.textContent = `Ready to export (${rows} triplets).`;
+    collectLink.classList.remove("visible");
+    return;
+  }
+
+  dataReadiness.className = "data-readiness";
+  if (stats.total === 0) {
+    dataReadiness.textContent = "Collect at least 1 positive and 1 negative label to export.";
+  } else if (stats.pos === 0 && stats.neg > 0) {
+    dataReadiness.textContent = "Missing positive labels. Mark a few items with 👍.";
+  } else if (stats.neg === 0 && stats.pos > 0) {
+    dataReadiness.textContent = "Missing negative labels. Mark a few items with 👎.";
+  } else {
+    dataReadiness.textContent = "Need at least 1 positive and 1 negative label to export.";
+  }
+
+  const url = getCollectionUrl();
+  if (url) {
+    collectLink.href = url;
+    collectLink.classList.add("visible");
+  } else {
+    collectLink.classList.remove("visible");
+  }
+}
 
 // --- Initialize ---
 async function init() {
@@ -45,17 +161,21 @@ async function init() {
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
   updateLensDisplay(anchor);
+
   // Populate model source: URL takes priority, then model ID
   const savedUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string) || "";
   const savedId = (stored[STORAGE_KEYS.CUSTOM_MODEL_ID] as string) || "";
   modelSourceInput.value = savedUrl || savedId;
+
   const sens = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
   sensitivitySlider.value = String(sens);
   sensitivityValue.textContent = `${sens}%`;
+
   const sites = stored[STORAGE_KEYS.SITE_ENABLED] ?? { hn: true, reddit: true, x: true };
   toggleHN.checked = sites.hn !== false;
   toggleReddit.checked = sites.reddit !== false;
   toggleX.checked = sites.x !== false;
+
   toggleExplain.checked = stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false;
 
   // Get model status
@@ -112,28 +232,30 @@ function updateModelStatus(status: ModelStatus) {
   }
 }
 
-async function refreshLabelCounts() {
+async function refreshLabelCounts(): Promise<TrainingLabel[]> {
   try {
     const response = await chrome.runtime.sendMessage({ type: MSG.GET_LABELS });
     const labels: TrainingLabel[] = response?.labels || [];
+    const stats = summarizeLabels(labels);
+    lastLabelStats = stats;
 
-    if (labels.length === 0) {
+    if (stats.total === 0) {
       labelCounts.textContent = "No labels collected yet.";
-      return;
+      updateDataReadiness(stats);
+      return labels;
     }
 
-    const hn = labels.filter((l) => l.source === "hn").length;
-    const reddit = labels.filter((l) => l.source === "reddit").length;
-    const x = labels.filter((l) => l.source === "x").length;
-    const xImport = labels.filter((l) => l.source === "x-import").length;
-    const pos = labels.filter((l) => l.label === "positive").length;
-    const neg = labels.filter((l) => l.label === "negative").length;
-
     labelCounts.textContent =
-      `Total: ${labels.length} (${pos} positive, ${neg} negative)\n` +
-      `HN: ${hn} | Reddit: ${reddit} | X: ${x} | Import: ${xImport}`;
+      `Total: ${stats.total} (${stats.pos} positive, ${stats.neg} negative)\n` +
+      `HN: ${stats.hn} | Reddit: ${stats.reddit} | X: ${stats.x} | Import: ${stats.xImport}`;
+
+    updateDataReadiness(stats);
+    return labels;
   } catch {
     labelCounts.textContent = "Unable to load label data.";
+    lastLabelStats = EMPTY_STATS;
+    updateDataReadiness(lastLabelStats);
+    return [];
   }
 }
 
@@ -166,18 +288,25 @@ async function applyAnchor(anchor: string) {
   anchorInput.value = anchor;
   updateLensDisplay(anchor);
   lensEditor.style.display = "none";
-  await chrome.runtime.sendMessage({
+
+  const response = await chrome.runtime.sendMessage({
     type: MSG.UPDATE_ANCHOR,
     payload: { anchor },
   });
+
+  if (response?.error) {
+    showToast(`Failed to update lens: ${response.error}`, { type: "error" });
+  } else {
+    showToast("Scoring lens updated.", { type: "success" });
+  }
 }
 
 saveAnchorBtn.addEventListener("click", () => {
-  applyAnchor(anchorInput.value.trim());
+  void applyAnchor(anchorInput.value.trim());
 });
 
 anchorInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") applyAnchor(anchorInput.value.trim());
+  if (e.key === "Enter") void applyAnchor(anchorInput.value.trim());
 });
 
 // Lens: preset chips
@@ -185,7 +314,7 @@ lensPresets.addEventListener("click", (e) => {
   const chip = (e.target as HTMLElement).closest<HTMLElement>(".lens-chip");
   if (!chip) return;
   const anchor = chip.dataset.anchor;
-  if (anchor) applyAnchor(anchor);
+  if (anchor) void applyAnchor(anchor);
 });
 
 function saveSiteToggles() {
@@ -196,6 +325,7 @@ function saveSiteToggles() {
       x: toggleX.checked,
     },
   });
+  updateDataReadiness(lastLabelStats);
 }
 
 toggleHN.addEventListener("change", saveSiteToggles);
@@ -206,9 +336,22 @@ toggleExplain.addEventListener("change", async () => {
   await chrome.storage.local.set({
     [STORAGE_KEYS.EXPLAIN_ENABLED]: toggleExplain.checked,
   });
-  if (toggleExplain.checked) {
-    // Trigger LLM load
-    await chrome.runtime.sendMessage({ type: MSG.RELOAD_MODEL });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: MSG.SET_EXPLAIN_ENABLED,
+      payload: { enabled: toggleExplain.checked },
+    });
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+    if (toggleExplain.checked) {
+      llmStatus.textContent = "Starting...";
+    } else {
+      llmStatus.textContent = "Off";
+    }
+  } catch (err) {
+    showToast(`Explain toggle failed: ${String(err)}`, { type: "error" });
   }
 });
 
@@ -237,11 +380,11 @@ saveModelSourceBtn.addEventListener("click", async () => {
 
 exportCsvBtn.addEventListener("click", async () => {
   try {
-    const response = await chrome.runtime.sendMessage({ type: MSG.GET_LABELS });
-    const labels: TrainingLabel[] = response?.labels || [];
+    const labels = await refreshLabelCounts();
+    const stats = summarizeLabels(labels);
 
-    if (labels.length === 0) {
-      alert("No training data to export.");
+    if (stats.pos === 0 || stats.neg === 0) {
+      showToast("Export needs both positive and negative labels.", { type: "error" });
       return;
     }
 
@@ -255,8 +398,10 @@ exportCsvBtn.addEventListener("click", async () => {
     a.download = `sift_training_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+
+    showToast(`Exported ${Math.max(stats.pos, stats.neg)} triplets.`, { type: "success" });
   } catch (err) {
-    alert(`Export failed: ${err}`);
+    showToast(`Export failed: ${String(err)}`, { type: "error" });
   }
 });
 
@@ -268,19 +413,23 @@ importXInput.addEventListener("change", async () => {
     const labels = await parseXArchiveFiles(files);
 
     if (labels.length === 0) {
-      alert("No tweets found in the uploaded files.");
+      showToast("No tweets found in the uploaded files.", { type: "error" });
       return;
     }
 
-    await chrome.runtime.sendMessage({
+    const response = await chrome.runtime.sendMessage({
       type: MSG.IMPORT_X_LABELS,
       payload: { labels },
     });
 
-    alert(`Imported ${labels.length} tweets as positive labels.`);
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+
+    showToast(`Imported ${labels.length} tweets as positive labels.`, { type: "success" });
     await refreshLabelCounts();
   } catch (err) {
-    alert(`Import failed: ${err}`);
+    showToast(`Import failed: ${String(err)}`, { type: "error" });
   }
 
   // Reset file input
@@ -288,10 +437,38 @@ importXInput.addEventListener("change", async () => {
 });
 
 clearDataBtn.addEventListener("click", async () => {
-  if (!confirm("Clear all training data? This cannot be undone.")) return;
+  const response = await chrome.runtime.sendMessage({ type: MSG.GET_LABELS });
+  const labels: TrainingLabel[] = response?.labels || [];
 
-  await chrome.runtime.sendMessage({ type: MSG.CLEAR_LABELS });
+  if (labels.length === 0) {
+    showToast("No training data to clear.");
+    return;
+  }
+
+  const clearResponse = await chrome.runtime.sendMessage({ type: MSG.CLEAR_LABELS });
+  if (clearResponse?.error) {
+    showToast(`Clear failed: ${clearResponse.error}`, { type: "error" });
+    return;
+  }
+
   await refreshLabelCounts();
+
+  showToast(`Cleared ${labels.length} labels.`, {
+    type: "success",
+    durationMs: 8000,
+    actionLabel: "Undo",
+    onAction: async () => {
+      const restoreResponse = await chrome.runtime.sendMessage({
+        type: MSG.SET_LABELS,
+        payload: { labels },
+      });
+      if (restoreResponse?.error) {
+        throw new Error(restoreResponse.error);
+      }
+      await refreshLabelCounts();
+      showToast("Training labels restored.", { type: "success" });
+    },
+  });
 });
 
 // --- Listen for status updates ---
@@ -312,4 +489,4 @@ syncThemeIcon();
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeIcon);
 
 // --- Start ---
-init();
+void init();

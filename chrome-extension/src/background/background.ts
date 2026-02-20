@@ -29,7 +29,9 @@ import type {
   TrainingLabel,
   SaveLabelPayload,
   UpdateAnchorPayload,
+  SetExplainEnabledPayload,
   ImportXLabelsPayload,
+  SetLabelsPayload,
   ScoreTextsPayload,
   ExplainScorePayload,
 } from "../shared/types";
@@ -375,10 +377,15 @@ let labelWriteQueue: Promise<void> = Promise.resolve();
 function enqueueLabelWrite(
   fn: (labels: TrainingLabel[]) => TrainingLabel[],
 ): Promise<void> {
-  labelWriteQueue = labelWriteQueue.then(async () => {
-    const labels = await readLabels();
-    await writeLabels(fn(labels));
-  });
+  labelWriteQueue = labelWriteQueue
+    .catch((err) => {
+      // Recover queue after failures so subsequent writes can proceed.
+      console.error("[bg] Label queue recovered from previous error:", err);
+    })
+    .then(async () => {
+      const labels = await readLabels();
+      await writeLabels(fn(labels));
+    });
   return labelWriteQueue;
 }
 
@@ -479,6 +486,23 @@ chrome.runtime.onMessage.addListener(
         return;
       }
 
+      case MSG.SET_EXPLAIN_ENABLED: {
+        const p = payload as SetExplainEnabledPayload;
+        const enabled = p?.enabled !== false;
+        if (!enabled) {
+          llmPipeline = null;
+          llmReady = false;
+          llmLoadingPromise = null;
+          broadcastStatus({ llmState: "idle", llmMessage: "Explain disabled" });
+          sendResponse({ ok: true });
+          return;
+        }
+        loadLLM()
+          .then(() => sendResponse({ ok: true }))
+          .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
       case MSG.SAVE_LABEL: {
         const { label } = payload as SaveLabelPayload;
         enqueueLabelWrite((labels) => { labels.push(label); return labels; })
@@ -494,8 +518,16 @@ chrome.runtime.onMessage.addListener(
         return true;
       }
 
+      case MSG.SET_LABELS: {
+        const { labels } = payload as SetLabelsPayload;
+        enqueueLabelWrite(() => (Array.isArray(labels) ? labels : []))
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
       case MSG.CLEAR_LABELS: {
-        writeLabels([])
+        enqueueLabelWrite(() => [])
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;

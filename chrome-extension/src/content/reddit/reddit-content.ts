@@ -1,5 +1,13 @@
+import { STORAGE_KEYS } from "../../shared/constants";
 import { scoreTexts } from "../common/batch-scorer";
-import { applyScore, loadSettings, isSiteEnabled, onModelReady } from "../common/widget";
+import {
+  applyScore,
+  clearAppliedScores,
+  loadSettings,
+  isSiteEnabled,
+  onModelReady,
+  resetSiftMarkers,
+} from "../common/widget";
 
 function getTitleElements(): { el: Element; text: string }[] {
   const items: { el: Element; text: string }[] = [];
@@ -46,6 +54,7 @@ async function processReddit() {
   items.forEach(({ el }) => {
     if (el instanceof HTMLElement) el.dataset.sift = "pending";
     else el.setAttribute("data-sift", "pending");
+    (el as HTMLElement).classList.add("ss-pending");
   });
 
   try {
@@ -56,6 +65,7 @@ async function processReddit() {
       const { el } = items[i];
       if (el instanceof HTMLElement) el.dataset.sift = "done";
       else el.setAttribute("data-sift", "done");
+      (el as HTMLElement).classList.remove("ss-pending");
 
       const htmlEl = el as HTMLElement;
 
@@ -73,6 +83,7 @@ async function processReddit() {
     items.forEach(({ el }) => {
       if (el instanceof HTMLElement) delete el.dataset.sift;
       else el.removeAttribute("data-sift");
+      (el as HTMLElement).classList.remove("ss-pending");
     });
   }
 }
@@ -87,7 +98,18 @@ const observer = new MutationObserver(() => {
 
 (async () => {
   await loadSettings();
-  processReddit();
+  void processReddit();
   observer.observe(document.body, { childList: true, subtree: true });
-  onModelReady(() => processReddit());
+  onModelReady(() => void processReddit());
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;
+    const enabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue?.reddit !== false;
+    if (!enabled) {
+      clearAppliedScores();
+      resetSiftMarkers();
+      return;
+    }
+    void processReddit();
+  });
 })();

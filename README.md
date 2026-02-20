@@ -52,6 +52,7 @@ Fine-tuned ONNX model files contain only numerical weights, tokenizer vocabulary
 ```bash
 # Push to HuggingFace Hub after training
 python train.py data.csv --push-to-hub your-username/sift-finetuned
+# Also valid: --push-to-hub sift-finetuned (auto-uses your username)
 ```
 
 Then set the model ID in the extension popup. No authentication is needed for public models.

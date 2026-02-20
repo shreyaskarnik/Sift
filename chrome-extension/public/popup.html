@@ -82,6 +82,10 @@
     <section id="data-section">
       <h2>Training Data</h2>
       <div id="label-counts">No labels collected yet.</div>
+      <div id="data-readiness" class="data-readiness"></div>
+      <a id="collect-link" class="collect-link" href="https://news.ycombinator.com/" target="_blank" rel="noreferrer">
+        Open an enabled site to collect labels
+      </a>
       <div class="button-group">
         <button id="export-csv">Export CSV</button>
         <label class="file-input-label" for="import-x">
@@ -96,6 +100,7 @@
       <p>Sift through the noise — powered by EmbeddingGemma.</p>
     </footer>
   </div>
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
   <script src="popup.js"></script>
 </body>
 </html>

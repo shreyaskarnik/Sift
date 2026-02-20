@@ -6,7 +6,6 @@ from sentence_transformers.losses import MultipleNegativesRankingLoss
 from transformers import TrainerCallback, TrainingArguments
 from typing import List, Callable, Optional
 from pathlib import Path
-from .config import AppConfig
 
 # --- Model/Utility Functions ---
 
@@ -61,16 +60,30 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
     """
     Uploads a local model folder to the Hugging Face Hub.
     Creates the repository if it doesn't exist.
+
+    repo_name accepts either:
+    - "model-name" (auto-prefixed with authenticated username)
+    - "owner/model-name" (used as-is)
     """
     try:
         api = HfApi(token=token)
-        
-        # Get the authenticated user's username
-        user_info = api.whoami()
-        username = user_info['name']
-        
-        # Construct the full repo ID
-        repo_id = f"{username}/{repo_name}"
+
+        requested = repo_name.strip().strip("/")
+        if not requested:
+            raise ValueError("Repository name cannot be empty.")
+        if requested.count("/") > 1:
+            raise ValueError(
+                f"Invalid repo name '{repo_name}'. Use 'model-name' or 'owner/model-name'."
+            )
+
+        # If owner is provided, use directly. Otherwise prefix with authenticated username.
+        if "/" in requested:
+            repo_id = requested
+        else:
+            user_info = api.whoami()
+            username = user_info["name"]
+            repo_id = f"{username}/{requested}"
+
         print(f"Preparing to upload to: {repo_id}")
 
         # Create the repo (safe if it already exists)
@@ -87,9 +100,15 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             repo_id=repo_id,
             token=token
         )
-        tags = info.card_data.tags
-        tags.append("embeddinggemma-tuning-lab")
-        metadata_update(repo_id, {"tags": tags}, overwrite=True, token=token)
+        tags = list((info.card_data.tags if info.card_data else []) or [])
+        if "embeddinggemma-tuning-lab" not in tags:
+            tags.append("embeddinggemma-tuning-lab")
+            metadata_update(
+                repo_id=repo_id,
+                metadata={"tags": tags},
+                overwrite=True,
+                token=token,
+            )
         
         return f"✅ Success! Model published at: {url}"
     except Exception as e:
@@ -116,7 +135,9 @@ def train_with_dataset(
     dataset: List[List[str]],
     output_dir: Path,
     task_name: str,
-    search_fn: Callable[[], str]
+    search_fn: Callable[[], str],
+    epochs: int = 4,
+    learning_rate: float = 2e-5,
 ) -> None:
     """
     Fine-tunes the provided Sentence Transformer MODEL on the dataset.
@@ -145,9 +166,9 @@ def train_with_dataset(
     args = SentenceTransformerTrainingArguments(
         output_dir=output_dir,
         prompts=prompts,
-        num_train_epochs=4,
+        num_train_epochs=epochs,
         per_device_train_batch_size=1,
-        learning_rate=2e-5,
+        learning_rate=learning_rate,
         warmup_ratio=0.1,
         logging_steps=train_dataset.num_rows,
         report_to="none",
