@@ -383,18 +383,12 @@ function enqueueLabelWrite(
 }
 
 // ---------------------------------------------------------------------------
-// Model initialization on install / startup
+// Model initialization — runs every time the service worker starts.
+// MV3 service workers get killed after ~30s idle; onInstalled/onStartup
+// do NOT fire on wake-up, so we load at module scope instead.
 // ---------------------------------------------------------------------------
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("[bg] onInstalled fired");
-  loadModels();
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  console.log("[bg] onStartup fired");
-  loadModels();
-});
+loadModels();
 
 // ---------------------------------------------------------------------------
 // Message routing
