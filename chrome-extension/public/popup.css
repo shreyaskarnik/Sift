@@ -204,6 +204,22 @@ h2 {
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Model ID Display ── */
+
+.model-id-display {
+  font-size: 10px;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-dim);
+  padding: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-id-display:empty {
+  display: none;
+}
+
 /* ── Inputs ── */
 
 label {

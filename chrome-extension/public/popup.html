@@ -26,6 +26,7 @@
         <span class="model-name">Scoring</span>
         <span id="model-status" class="model-detail">Initializing...</span>
       </div>
+      <div id="model-id-display" class="model-id-display"></div>
       <div id="progress-bar-container" style="display:none">
         <div id="progress-bar"></div>
       </div>
@@ -71,15 +72,10 @@
         <input type="range" id="sensitivity-slider" min="0" max="100" value="50">
         <span class="slider-hint">Aggressive</span>
       </div>
-      <label for="model-id-input">Model ID <small>(blank = default)</small></label>
+      <label for="model-source-input">Model Source <small>(blank = default)</small></label>
       <div class="input-row">
-        <input type="text" id="model-id-input" placeholder="onnx-community/embeddinggemma-300m-ONNX">
-        <button id="save-model-id">Apply</button>
-      </div>
-      <label for="model-url-input">Local Server URL <small>(overrides Model ID)</small></label>
-      <div class="input-row">
-        <input type="text" id="model-url-input" placeholder="http://localhost:8000">
-        <button id="save-model-url">Apply</button>
+        <input type="text" id="model-source-input" placeholder="org/model-ONNX or http://localhost:8000">
+        <button id="save-model-source">Apply</button>
       </div>
     </section>
 

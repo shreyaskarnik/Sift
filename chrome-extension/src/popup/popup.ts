@@ -27,10 +27,9 @@ const toggleX = document.getElementById("toggle-x") as HTMLInputElement;
 const sensitivitySlider = document.getElementById("sensitivity-slider") as HTMLInputElement;
 const sensitivityValue = document.getElementById("sensitivity-value")!;
 const toggleExplain = document.getElementById("toggle-explain") as HTMLInputElement;
-const modelIdInput = document.getElementById("model-id-input") as HTMLInputElement;
-const saveModelIdBtn = document.getElementById("save-model-id")!;
-const modelUrlInput = document.getElementById("model-url-input") as HTMLInputElement;
-const saveModelUrlBtn = document.getElementById("save-model-url")!;
+const modelSourceInput = document.getElementById("model-source-input") as HTMLInputElement;
+const saveModelSourceBtn = document.getElementById("save-model-source")!;
+const modelIdDisplay = document.getElementById("model-id-display")!;
 
 // --- Initialize ---
 async function init() {
@@ -46,8 +45,10 @@ async function init() {
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
   updateLensDisplay(anchor);
-  modelIdInput.value = stored[STORAGE_KEYS.CUSTOM_MODEL_ID] || "";
-  modelUrlInput.value = stored[STORAGE_KEYS.CUSTOM_MODEL_URL] || "";
+  // Populate model source: URL takes priority, then model ID
+  const savedUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string) || "";
+  const savedId = (stored[STORAGE_KEYS.CUSTOM_MODEL_ID] as string) || "";
+  modelSourceInput.value = savedUrl || savedId;
   const sens = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
   sensitivitySlider.value = String(sens);
   sensitivityValue.textContent = `${sens}%`;
@@ -71,6 +72,9 @@ async function init() {
 
 function updateModelStatus(status: ModelStatus) {
   statusDot.className = "status-dot " + status.state;
+
+  // Show which model is loaded
+  modelIdDisplay.textContent = status.modelId || "";
 
   // Embedding model status
   if (status.state === "loading") {
@@ -214,23 +218,20 @@ sensitivitySlider.addEventListener("input", () => {
   chrome.storage.local.set({ [STORAGE_KEYS.SENSITIVITY]: val });
 });
 
-saveModelIdBtn.addEventListener("click", async () => {
-  const id = modelIdInput.value.trim();
-  await chrome.storage.local.set({ [STORAGE_KEYS.CUSTOM_MODEL_ID]: id });
-  await chrome.runtime.sendMessage({ type: MSG.RELOAD_MODEL });
-  saveModelIdBtn.textContent = "Reloading...";
-  setTimeout(() => {
-    saveModelIdBtn.textContent = "Apply";
-  }, 2000);
-});
+saveModelSourceBtn.addEventListener("click", async () => {
+  const value = modelSourceInput.value.trim();
+  const isUrl = /^https?:\/\//i.test(value);
 
-saveModelUrlBtn.addEventListener("click", async () => {
-  const url = modelUrlInput.value.trim();
-  await chrome.storage.local.set({ [STORAGE_KEYS.CUSTOM_MODEL_URL]: url });
+  // Set the matching key, clear the other — they're mutually exclusive
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.CUSTOM_MODEL_URL]: isUrl ? value : "",
+    [STORAGE_KEYS.CUSTOM_MODEL_ID]: isUrl ? "" : value,
+  });
+
   await chrome.runtime.sendMessage({ type: MSG.RELOAD_MODEL });
-  saveModelUrlBtn.textContent = "Reloading...";
+  saveModelSourceBtn.textContent = "Reloading...";
   setTimeout(() => {
-    saveModelUrlBtn.textContent = "Apply";
+    saveModelSourceBtn.textContent = "Apply";
   }, 2000);
 });
 

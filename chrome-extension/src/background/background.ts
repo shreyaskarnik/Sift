@@ -125,11 +125,15 @@ async function loadEmbeddingModel(): Promise<void> {
       const dtype = "q4";
       const modelSuffix = hasWebGPU && !isLocal ? "model_no_gather" : "model";
 
+      // Resolved display name: show URL for local, otherwise the model ID
+      const displayModelId = isLocal ? customUrl! : modelId;
+
       console.log(`[bg] Loading embedding model ${modelId} on ${device} (dtype=${dtype})...`);
       broadcastStatus({
         state: "loading",
         message: `Loading embedding model on ${device}...`,
         backend: device,
+        modelId: displayModelId,
       });
 
       const progressCallback = (progress: ProgressInfo) => {

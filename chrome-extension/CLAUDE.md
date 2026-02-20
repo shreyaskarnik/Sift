@@ -67,20 +67,26 @@ Status broadcasting includes both `state` (embedding model) and `llmState` (Gemm
 - **`src/storage/csv-export.ts`** — Exports labels as Anchor/Positive/Negative triplet CSV for training.
 - **`src/storage/x-archive-parser.ts`** — Parses X data archive files (like.js, bookmark.js) into positive labels.
 
-### Dead Code
-
-`src/offscreen/` (offscreen.ts, sandbox.ts, worker.ts) contains a previous offscreen→sandbox→iframe approach that is **no longer used**. The current architecture loads models directly in the service worker. These files can be deleted.
-
-`src/content/common/badge-injector.ts` is from the original pill-badge UI, now replaced by ambient dimming in widget.ts.
-
 ## Key Technical Details
 
 - **Transformers.js v4** (`@huggingface/transformers@next`) — loads ONNX models directly in service workers. Only needs `wasm-unsafe-eval` in CSP.
 - **WebGPU vs WASM** — auto-detected at runtime. WebGPU uses `model_no_gather` variant for embedding model; WASM uses `model`.
 - **dtype `q4`** — Both models use 4-bit quantization. Transformers.js auto-appends `_q4` to `model_file_name`.
-- **Custom model URL** — stored in `chrome.storage.local`. Sets `env.remoteHost` for Transformers.js, which fetches `{remoteHost}/{modelId}/resolve/main/{filename}`. Applies to embedding model only; LLM always loads from HuggingFace.
+- **Custom model source** — A single "Model Source" input accepts either a HuggingFace model ID (e.g. `org/model-ONNX`) or a local server URL (e.g. `http://localhost:8000`). Auto-detected by `http(s)://` prefix; the two are mutually exclusive. Stored in `chrome.storage.local` as `CUSTOM_MODEL_ID` or `CUSTOM_MODEL_URL`. URLs set `env.remoteHost` for Transformers.js. Applies to embedding model only; LLM always loads from HuggingFace.
+- **Model status includes `modelId`** — `ModelStatus.modelId` broadcasts the resolved display name (URL for local, HF model ID for remote) so the popup shows which model is active.
 - The embedding model output key is `sentence_embedding` (normalized vectors), so cosine similarity reduces to a dot product.
 - LLM uses the `pipeline("text-generation")` API with `max_new_tokens: 80`.
+- **HF auth not supported browser-side** — Transformers.js v4 intentionally disables browser auth. Finetuned models must be public on HuggingFace Hub. ONNX files contain only numerical weights and tokenizer data — safe to publish.
+
+## Service Worker Gotchas
+
+- **No `window` APIs** — `self.matchMedia()`, `document`, `localStorage` etc. are NOT available in MV3 service workers. Theme detection is done in popup (`popup.ts`) and content scripts (`widget.ts`) which have `window.matchMedia`, then persisted to `chrome.storage.local`. The background listens for storage changes to apply theme-aware icons via `chrome.action.setIcon()`.
+- **`chrome.runtime.sendMessage()` broadcasts** — Messages go to ALL extension contexts. The background ignores its own `MODEL_STATUS` messages to avoid loops.
+
+## Data Quality
+
+- **X archive parser** (`x-archive-parser.ts`) — Strips `t.co` and other URLs, trailing truncation markers (`…`), collapses whitespace, and rejects entries under 15 characters.
+- **CSV export** (`csv-export.ts`) — `csvEscape()` normalizes all whitespace (newlines, tabs) to single spaces before quoting, preventing multiline CSV fields.
 
 ## Parent Project
 

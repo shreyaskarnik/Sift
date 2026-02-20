@@ -21,6 +21,7 @@ export interface ModelStatus {
   progress?: number;
   message?: string;
   backend?: "webgpu" | "wasm";
+  modelId?: string;
   llmState?: "idle" | "loading" | "ready" | "error";
   llmMessage?: string;
 }

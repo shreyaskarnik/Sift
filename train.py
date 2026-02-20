@@ -182,11 +182,13 @@ def main():
                         help="Skip training, convert existing model to ONNX")
     parser.add_argument("--serve", type=str, default=None,
                         help="Serve a converted model dir locally for testing")
+    parser.add_argument("--port", type=int, default=8000,
+                        help="Port for --serve (default: 8000)")
     args = parser.parse_args()
 
     # --- Serve mode ---
     if args.serve:
-        serve_model(Path(args.serve))
+        serve_model(Path(args.serve), port=args.port)
         return
 
     # --- Convert-only mode ---
