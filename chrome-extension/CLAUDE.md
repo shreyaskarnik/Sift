@@ -36,7 +36,7 @@ Path alias: `@shared` → `src/shared/`.
 
 ### Message Flow
 
-```
+```bash
 Content Scripts ──chrome.runtime.sendMessage──► Background Service Worker
     (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                         │
@@ -49,6 +49,7 @@ All inter-context communication uses `chrome.runtime.sendMessage` with typed mes
 ### Dual Model Architecture
 
 The service worker loads both models sequentially on init:
+
 1. EmbeddingGemma-300M via `AutoModel.from_pretrained()` for embedding/scoring
 2. Gemma 3 270M IT via `pipeline("text-generation")` for explanations
 
