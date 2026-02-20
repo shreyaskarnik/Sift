@@ -27,6 +27,8 @@ const toggleX = document.getElementById("toggle-x") as HTMLInputElement;
 const sensitivitySlider = document.getElementById("sensitivity-slider") as HTMLInputElement;
 const sensitivityValue = document.getElementById("sensitivity-value")!;
 const toggleExplain = document.getElementById("toggle-explain") as HTMLInputElement;
+const modelIdInput = document.getElementById("model-id-input") as HTMLInputElement;
+const saveModelIdBtn = document.getElementById("save-model-id")!;
 const modelUrlInput = document.getElementById("model-url-input") as HTMLInputElement;
 const saveModelUrlBtn = document.getElementById("save-model-url")!;
 
@@ -35,6 +37,7 @@ async function init() {
   // Load saved settings
   const stored = await chrome.storage.local.get([
     STORAGE_KEYS.ANCHOR,
+    STORAGE_KEYS.CUSTOM_MODEL_ID,
     STORAGE_KEYS.CUSTOM_MODEL_URL,
     STORAGE_KEYS.SENSITIVITY,
     STORAGE_KEYS.SITE_ENABLED,
@@ -43,6 +46,7 @@ async function init() {
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
   updateLensDisplay(anchor);
+  modelIdInput.value = stored[STORAGE_KEYS.CUSTOM_MODEL_ID] || "";
   modelUrlInput.value = stored[STORAGE_KEYS.CUSTOM_MODEL_URL] || "";
   const sens = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
   sensitivitySlider.value = String(sens);
@@ -210,6 +214,16 @@ sensitivitySlider.addEventListener("input", () => {
   chrome.storage.local.set({ [STORAGE_KEYS.SENSITIVITY]: val });
 });
 
+saveModelIdBtn.addEventListener("click", async () => {
+  const id = modelIdInput.value.trim();
+  await chrome.storage.local.set({ [STORAGE_KEYS.CUSTOM_MODEL_ID]: id });
+  await chrome.runtime.sendMessage({ type: MSG.RELOAD_MODEL });
+  saveModelIdBtn.textContent = "Reloading...";
+  setTimeout(() => {
+    saveModelIdBtn.textContent = "Apply";
+  }, 2000);
+});
+
 saveModelUrlBtn.addEventListener("click", async () => {
   const url = modelUrlInput.value.trim();
   await chrome.storage.local.set({ [STORAGE_KEYS.CUSTOM_MODEL_URL]: url });
@@ -285,6 +299,16 @@ chrome.runtime.onMessage.addListener((message) => {
     updateModelStatus(message.payload);
   }
 });
+
+// --- Theme-aware icon ---
+// Popup has window.matchMedia; service worker does not.
+// Detect theme here and persist to storage so the background can apply the icon.
+function syncThemeIcon() {
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  chrome.storage.local.set({ theme_dark: dark });
+}
+syncThemeIcon();
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeIcon);
 
 // --- Start ---
 init();

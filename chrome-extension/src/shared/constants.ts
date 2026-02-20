@@ -49,6 +49,7 @@ export const STORAGE_KEYS = {
   LABELS: "training_labels",
   ANCHOR: "query_anchor",
   MODEL_DTYPE: "model_dtype",
+  CUSTOM_MODEL_ID: "custom_model_id",
   CUSTOM_MODEL_URL: "custom_model_url",
   SENSITIVITY: "score_sensitivity",
   SITE_ENABLED: "site_enabled",

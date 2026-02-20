@@ -25,6 +25,23 @@ export async function parseXArchiveFiles(files: FileList): Promise<TrainingLabel
   return labels;
 }
 
+/** Clean raw tweet text for embedding training. */
+function cleanTweetText(raw: string): string {
+  let text = raw;
+  // Strip t.co URLs
+  text = text.replace(/https?:\/\/t\.co\/\S+/g, "");
+  // Strip other URLs
+  text = text.replace(/https?:\/\/\S+/g, "");
+  // Strip trailing truncation marker
+  text = text.replace(/…\s*$/, "");
+  // Collapse whitespace
+  text = text.replace(/\s+/g, " ").trim();
+  return text;
+}
+
+/** Minimum character length for useful training text. */
+const MIN_TEXT_LENGTH = 15;
+
 function parseXArchiveContent(content: string): string[] {
   // Strip the "window.YTD.*.part0 = " prefix
   const jsonStart = content.indexOf("[");
@@ -43,8 +60,11 @@ function parseXArchiveContent(content: string): string[] {
       const entry = item.like || item.bookmark || item;
       const fullText = entry.fullText || entry.full_text || entry.text;
 
-      if (fullText && typeof fullText === "string" && fullText.trim()) {
-        texts.push(fullText.trim());
+      if (fullText && typeof fullText === "string") {
+        const cleaned = cleanTweetText(fullText);
+        if (cleaned.length >= MIN_TEXT_LENGTH) {
+          texts.push(cleaned);
+        }
       }
     }
 

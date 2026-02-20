@@ -41,6 +41,28 @@ import type {
 env.allowLocalModels = false;
 
 // ---------------------------------------------------------------------------
+// Theme-aware icon (set from popup/content scripts via storage)
+// ---------------------------------------------------------------------------
+
+function applyThemeIcon(dark: boolean): void {
+  const suffix = dark ? "dark" : "light";
+  chrome.action.setIcon({
+    path: {
+      16: `icons/icon16-${suffix}.png`,
+      48: `icons/icon48-${suffix}.png`,
+      128: `icons/icon128-${suffix}.png`,
+    },
+  });
+}
+
+// Listen for theme changes from contexts that have matchMedia
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes["theme_dark"]) {
+    applyThemeIcon(changes["theme_dark"].newValue !== false);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // State — Embedding model
 // ---------------------------------------------------------------------------
 
@@ -81,11 +103,15 @@ async function loadEmbeddingModel(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
-      const stored = await chrome.storage.local.get(STORAGE_KEYS.CUSTOM_MODEL_URL);
+      const stored = await chrome.storage.local.get([
+        STORAGE_KEYS.CUSTOM_MODEL_URL,
+        STORAGE_KEYS.CUSTOM_MODEL_ID,
+      ]);
       const customUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string | undefined)?.trim();
+      const customModelId = (stored[STORAGE_KEYS.CUSTOM_MODEL_ID] as string | undefined)?.trim();
       const isLocal = !!customUrl;
 
-      const modelId = isLocal ? "local" : MODEL_ID;
+      const modelId = isLocal ? "local" : (customModelId || MODEL_ID);
       if (isLocal) {
         env.remoteHost = customUrl!;
         env.allowLocalModels = false;

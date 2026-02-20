@@ -46,6 +46,15 @@ export function onModelReady(callback: () => void): void {
   });
 }
 
+// Sync theme for icon (content scripts have matchMedia, service worker doesn't)
+try {
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  chrome.storage.local.set({ theme_dark: dark });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+    chrome.storage.local.set({ theme_dark: e.matches });
+  });
+} catch { /* non-critical */ }
+
 // Live-update when user changes settings in the popup
 chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.SENSITIVITY]) {
@@ -101,7 +110,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
     const rect = btn.getBoundingClientRect();
 
     const tip = document.createElement("div");
-    tip.className = "ss-explain-tip";
+    tip.className = "ss-explain-tip ss-thinking";
     tip.textContent = "Thinking\u2026";
     tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
     tip.style.left = `${rect.left + window.scrollX}px`;
@@ -114,6 +123,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
         payload: { text, score },
       });
       if (!document.body.contains(tip)) return; // dismissed while loading
+      tip.classList.remove("ss-thinking");
       if (resp?.error) {
         tip.textContent = resp.error;
       } else {
@@ -121,6 +131,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
       }
     } catch {
       if (document.body.contains(tip)) {
+        tip.classList.remove("ss-thinking");
         tip.textContent = "LLM not available.";
       }
     }

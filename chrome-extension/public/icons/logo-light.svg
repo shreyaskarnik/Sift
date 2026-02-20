@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="funnelGrad" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#F1F5F9"/>
+
+  <!-- Bold funnel — fills most of the canvas -->
+  <path d="M96 128 L416 128 L416 168 L296 320 L296 384 L216 384 L216 320 L96 168 Z"
+        fill="url(#funnelGrad)"/>
+
+  <!-- Signal line emerging from funnel -->
+  <rect x="216" y="384" width="80" height="16" rx="8" fill="#0F172A"/>
+</svg>

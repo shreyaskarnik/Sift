@@ -47,8 +47,10 @@ export function exportToCSV(labels: TrainingLabel[], anchor: string): string {
 }
 
 function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Normalize whitespace to single spaces (removes newlines, tabs, etc.)
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.includes(",") || clean.includes('"')) {
+    return `"${clean.replace(/"/g, '""')}"`;
   }
-  return value;
+  return clean;
 }
