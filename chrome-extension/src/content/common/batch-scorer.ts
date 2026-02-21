@@ -1,5 +1,5 @@
 import { MSG, SCORE_BATCH_SIZE } from "../../shared/constants";
-import type { VibeResult } from "../../shared/types";
+import type { ScoredItem, DetectedAnchor } from "../../shared/types";
 
 /** Wait for the model AND anchor to be ready, polling with exponential backoff. */
 async function waitForModel(maxWaitMs = 120_000): Promise<void> {
@@ -19,10 +19,10 @@ async function waitForModel(maxWaitMs = 120_000): Promise<void> {
   throw new Error("Model did not become ready in time");
 }
 
-export async function scoreTexts(texts: string[]): Promise<VibeResult[]> {
+export async function scoreTexts(texts: string[]): Promise<ScoredItem[]> {
   await waitForModel();
 
-  const results: VibeResult[] = [];
+  const items: ScoredItem[] = [];
 
   for (let i = 0; i < texts.length; i += SCORE_BATCH_SIZE) {
     const batch = texts.slice(i, i + SCORE_BATCH_SIZE);
@@ -34,9 +34,12 @@ export async function scoreTexts(texts: string[]): Promise<VibeResult[]> {
       throw new Error(response.error);
     }
     if (response?.results) {
-      results.push(...response.results);
+      const anchors: (DetectedAnchor[] | undefined)[] = response.detectedAnchors ?? [];
+      response.results.forEach((result: ScoredItem["result"], j: number) => {
+        items.push({ result, detectedAnchors: anchors[j] });
+      });
     }
   }
 
-  return results;
+  return items;
 }

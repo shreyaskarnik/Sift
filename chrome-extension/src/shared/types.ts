@@ -42,6 +42,19 @@ export interface ScoreTextsPayload {
 /** Payload for SCORE_RESULTS */
 export interface ScoreResultsPayload {
   results: VibeResult[];
+  detectedAnchors?: (DetectedAnchor[] | undefined)[];
+}
+
+/** Detected anchor with similarity score for grounded display. */
+export interface DetectedAnchor {
+  id: string;
+  score: number;
+}
+
+/** A scored text with optional detected lens anchors. */
+export interface ScoredItem {
+  result: VibeResult;
+  detectedAnchors?: DetectedAnchor[];
 }
 
 /** Payload for SAVE_LABEL */
@@ -80,5 +93,11 @@ export interface PageScoreResponse {
   title: string;
   normalizedTitle: string;
   result: VibeResult | null;
+  detectedAnchors?: string[];
   state: "ready" | "loading" | "unavailable" | "disabled";
+}
+
+/** Payload broadcast via PAGE_SCORE_UPDATED (includes tabId for routing) */
+export interface PageScoreUpdatedPayload extends PageScoreResponse {
+  tabId: number;
 }

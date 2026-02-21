@@ -6,6 +6,7 @@ import {
   loadSettings,
   isSiteEnabled,
   onModelReady,
+  onAnchorChange,
   resetSiftMarkers,
 } from "../common/widget";
 
@@ -32,13 +33,13 @@ async function processX() {
 
   try {
     const texts = unprocessed.map((u) => u.text);
-    const results = await scoreTexts(texts);
+    const items = await scoreTexts(texts);
 
-    results.forEach((result, i) => {
+    items.forEach(({ result, detectedAnchors }, i) => {
       const { el } = unprocessed[i];
       el.dataset.sift = "done";
       el.classList.remove("ss-pending");
-      applyScore(result, el, el, "x");
+      applyScore(result, el, el, "x", detectedAnchors);
     });
   } catch {
     // Reset so items can be retried
@@ -62,6 +63,7 @@ const observer = new MutationObserver(() => {
   void processX();
   observer.observe(document.body, { childList: true, subtree: true });
   onModelReady(() => void processX());
+  onAnchorChange(() => void processX());
 
   chrome.storage.onChanged.addListener((changes) => {
     if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;

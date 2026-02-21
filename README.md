@@ -23,8 +23,9 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 1. **Anchor phrase** — You pick a "scoring lens" like `MY_FAVORITE_NEWS` or `AI_RESEARCH`
 2. **Embedding** — Every title/tweet gets embedded by EmbeddingGemma running in your browser (WebGPU/WASM)
 3. **Scoring** — Cosine similarity against the anchor embedding produces a 0–1 score
-4. **Dimming** — Low scores fade out, high scores stay bright. Sensitivity is adjustable
-5. **Training** — Thumbs up/down on items exports as CSV triplets for fine-tuning
+4. **Lens detection** — Each item is also compared against all preset lenses; top matches appear as clickable pills in the popup and feed inspector
+5. **Dimming** — Low scores fade out, high scores stay bright. Sensitivity is adjustable
+6. **Training** — Thumbs up/down on items exports as per-anchor CSV triplets for fine-tuning
 
 ## Extension
 
@@ -39,7 +40,8 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - Scores HN, Reddit, and X feeds with ambient opacity dimming
 - Per-site toggles and sensitivity slider
 - Scoring lens presets (News, AI Research, Startups, Deep Tech, Science)
-- Thumbs up/down training labels with CSV export
+- **Auto-detected lens pills** — popup hero card and feed inspector show which preset lenses match the current page/item, clickable to switch scoring lens
+- Thumbs up/down training labels with per-anchor CSV export
 - X archive import (like.js, bookmark.js)
 - Light/dark mode (follows system)
 - Custom model URL for testing local fine-tuned models

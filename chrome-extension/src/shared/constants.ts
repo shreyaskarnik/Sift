@@ -15,6 +15,15 @@ export const PRESET_ANCHORS = [
   "SCIENCE_DISCOVERIES",
 ] as const;
 
+/** Human-readable labels for preset anchors (shared by popup + background) */
+export const ANCHOR_LABELS: Record<string, string> = {
+  MY_FAVORITE_NEWS: "News",
+  AI_RESEARCH: "AI Research",
+  STARTUP_NEWS: "Startups",
+  DEEP_TECH: "Deep Tech",
+  SCIENCE_DISCOVERIES: "Science",
+};
+
 /** Vibe thresholds — score boundaries for each status tier */
 export const VIBE_THRESHOLDS = [
   { score: 0.8, status: "VIBE:HIGH", emoji: "✨" },

@@ -6,6 +6,7 @@ import {
   loadSettings,
   isSiteEnabled,
   onModelReady,
+  onAnchorChange,
   resetSiftMarkers,
 } from "../common/widget";
 
@@ -59,9 +60,9 @@ async function processReddit() {
 
   try {
     const texts = items.map((i) => i.text);
-    const results = await scoreTexts(texts);
+    const scored = await scoreTexts(texts);
 
-    results.forEach((result, i) => {
+    scored.forEach(({ result, detectedAnchors }, i) => {
       const { el } = items[i];
       if (el instanceof HTMLElement) el.dataset.sift = "done";
       else el.setAttribute("data-sift", "done");
@@ -73,9 +74,9 @@ async function processReddit() {
         const titleSlot =
           el.querySelector('[slot="title"]') ||
           el.querySelector("a[slot='full-post-link']");
-        applyScore(result, htmlEl, (titleSlot || htmlEl) as HTMLElement, "reddit");
+        applyScore(result, htmlEl, (titleSlot || htmlEl) as HTMLElement, "reddit", detectedAnchors);
       } else {
-        applyScore(result, htmlEl, htmlEl, "reddit");
+        applyScore(result, htmlEl, htmlEl, "reddit", detectedAnchors);
       }
     });
   } catch {
@@ -101,6 +102,7 @@ const observer = new MutationObserver(() => {
   void processReddit();
   observer.observe(document.body, { childList: true, subtree: true });
   onModelReady(() => void processReddit());
+  onAnchorChange(() => void processReddit());
 
   chrome.storage.onChanged.addListener((changes) => {
     if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;

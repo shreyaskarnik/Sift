@@ -1,8 +1,8 @@
-import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR } from "../shared/constants";
+import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_LABELS } from "../shared/constants";
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
-import { exportToCSV } from "../storage/csv-export";
+import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
-import type { TrainingLabel, ModelStatus, PageScoreResponse } from "../shared/types";
+import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload } from "../shared/types";
 
 // --- DOM Elements ---
 const statusDot = document.getElementById("status-dot")!;
@@ -40,6 +40,7 @@ const pageScoreRow = document.getElementById("page-score-row")!;
 const pageScoreBand = document.getElementById("page-score-band")!;
 const pageScoreValue = document.getElementById("page-score-value")!;
 const pageScoreActions = document.getElementById("page-score-actions")!;
+const pageScoreAnchors = document.getElementById("page-score-anchors")!;
 const pageScoreExplain = document.getElementById("page-score-explain")!;
 const labelCountBadge = document.getElementById("label-count-badge")!;
 
@@ -65,6 +66,7 @@ const EMPTY_STATS: LabelStats = {
   web: 0,
 };
 
+let lastLabels: TrainingLabel[] = [];
 let lastLabelStats: LabelStats = EMPTY_STATS;
 
 type ToastType = "info" | "success" | "error";
@@ -128,13 +130,14 @@ function getCollectionUrl(): string | null {
 }
 
 function updateDataReadiness(stats: LabelStats): void {
-  const ready = stats.pos > 0 && stats.neg > 0;
+  const anchor = anchorInput.value.trim() || DEFAULT_QUERY_ANCHOR;
+  const triplets = countExportableTriplets(lastLabels, anchor);
+  const ready = triplets > 0;
   exportCsvBtn.disabled = !ready;
 
   if (ready) {
-    const rows = Math.max(stats.pos, stats.neg);
     dataReadiness.className = "data-readiness ready";
-    dataReadiness.textContent = `Ready to export (${rows} triplets).`;
+    dataReadiness.textContent = `Ready to export (${triplets} triplets).`;
     collectLink.classList.remove("visible");
     return;
   }
@@ -143,9 +146,11 @@ function updateDataReadiness(stats: LabelStats): void {
   if (stats.total === 0) {
     dataReadiness.textContent = "Collect at least 1 positive and 1 negative label to export.";
   } else if (stats.pos === 0 && stats.neg > 0) {
-    dataReadiness.textContent = "Missing positive labels. Mark a few items with 👍.";
+    dataReadiness.textContent = "Missing positive labels. Mark a few items with \uD83D\uDC4D.";
   } else if (stats.neg === 0 && stats.pos > 0) {
-    dataReadiness.textContent = "Missing negative labels. Mark a few items with 👎.";
+    dataReadiness.textContent = "Missing negative labels. Mark a few items with \uD83D\uDC4E.";
+  } else if (stats.pos > 0 && stats.neg > 0) {
+    dataReadiness.textContent = "Labels exist but no anchor group has both positive and negative.";
   } else {
     dataReadiness.textContent = "Need at least 1 positive and 1 negative label to export.";
   }
@@ -238,6 +243,7 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
   try {
     const response = await chrome.runtime.sendMessage({ type: MSG.GET_LABELS });
     const labels: TrainingLabel[] = response?.labels || [];
+    lastLabels = labels;
     const stats = summarizeLabels(labels);
     lastLabelStats = stats;
 
@@ -260,6 +266,7 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
     return labels;
   } catch {
     labelCounts.textContent = "Unable to load label data.";
+    lastLabels = [];
     lastLabelStats = EMPTY_STATS;
     labelCountBadge.textContent = "";
     updateDataReadiness(lastLabelStats);
@@ -306,6 +313,8 @@ async function applyAnchor(anchor: string) {
     showToast(`Failed to update lens: ${response.error}`, { type: "error" });
   } else {
     showToast("Scoring lens updated.", { type: "success" });
+    // Readiness depends on current anchor — refresh after switch
+    updateDataReadiness(lastLabelStats);
   }
 }
 
@@ -366,14 +375,14 @@ saveModelSourceBtn.addEventListener("click", async () => {
 exportCsvBtn.addEventListener("click", async () => {
   try {
     const labels = await refreshLabelCounts();
-    const stats = summarizeLabels(labels);
+    const anchor = anchorInput.value.trim() || DEFAULT_QUERY_ANCHOR;
 
-    if (stats.pos === 0 || stats.neg === 0) {
-      showToast("Export needs both positive and negative labels.", { type: "error" });
+    if (countExportableTriplets(labels, anchor) === 0) {
+      showToast("No anchor group has both positive and negative labels.", { type: "error" });
       return;
     }
 
-    const csv = exportToCSV(labels, anchorInput.value.trim() || DEFAULT_QUERY_ANCHOR);
+    const csv = exportToCSV(labels, anchor);
 
     // Download
     const blob = new Blob([csv], { type: "text/csv" });
@@ -384,7 +393,8 @@ exportCsvBtn.addEventListener("click", async () => {
     a.click();
     URL.revokeObjectURL(url);
 
-    showToast(`Exported ${Math.max(stats.pos, stats.neg)} triplets.`, { type: "success" });
+    const tripletCount = csv.trimEnd().split("\n").length - 1; // minus header
+    showToast(`Exported ${tripletCount} triplets.`, { type: "success" });
   } catch (err) {
     showToast(`Export failed: ${String(err)}`, { type: "error" });
   }
@@ -469,6 +479,8 @@ function renderPageScore(resp: PageScoreResponse): void {
   pageScoreCard.classList.remove("disabled", "loading");
   heroCard.classList.remove("is-ready", "is-disabled", "is-loading", "is-unavailable");
   pageScoreExplain.style.display = "none";
+  pageScoreAnchors.style.display = "none";
+  pageScoreAnchors.textContent = "";
 
   if (resp.state === "disabled") {
     pageScoreCard.classList.add("disabled");
@@ -560,6 +572,22 @@ function renderPageScore(resp: PageScoreResponse): void {
   });
 
   pageScoreActions.append(upBtn, downBtn, explainBtn);
+
+  // Render detected anchor pills (clickable — switches scoring lens)
+  if (resp.detectedAnchors?.length) {
+    const activeAnchor = anchorInput.value;
+    for (const id of resp.detectedAnchors) {
+      const pill = document.createElement("button");
+      pill.className = "page-score-anchor-pill";
+      if (id === activeAnchor) pill.classList.add("active");
+      const label = ANCHOR_LABELS[id] || id;
+      pill.textContent = label;
+      pill.title = `Score with ${label} lens`;
+      pill.addEventListener("click", () => void applyAnchor(id));
+      pageScoreAnchors.appendChild(pill);
+    }
+    pageScoreAnchors.style.display = "flex";
+  }
 }
 
 async function savePageLabel(label: "positive" | "negative"): Promise<void> {
@@ -614,9 +642,9 @@ chrome.runtime.onMessage.addListener((message) => {
     updateModelStatus(message.payload);
   }
   if (message.type === MSG.PAGE_SCORE_UPDATED) {
-    const payload = message.payload;
+    const payload = message.payload as PageScoreUpdatedPayload;
     if (payload?.tabId === currentPageTabId) {
-      renderPageScore(payload as PageScoreResponse);
+      renderPageScore(payload);
     }
   }
 });

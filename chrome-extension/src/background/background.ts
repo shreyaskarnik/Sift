@@ -20,6 +20,7 @@ import {
   STORAGE_KEYS,
   DEFAULT_QUERY_ANCHOR,
   MODEL_ID,
+  PRESET_ANCHORS,
   VIBE_THRESHOLDS,
 } from "../shared/constants";
 import type {
@@ -35,6 +36,7 @@ import type {
   ExplainScorePayload,
   GetPageScorePayload,
   PageScoreResponse,
+  PageScoreUpdatedPayload,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
 
@@ -73,9 +75,19 @@ chrome.storage.onChanged.addListener((changes) => {
 let tokenizer: PreTrainedTokenizer | null = null;
 let model: PreTrainedModel | null = null;
 let anchorEmbedding: Float32Array | null = null;
+let currentAnchor = DEFAULT_QUERY_ANCHOR;
 let modelReady = false;
 let anchorReady = false;
 let loadingPromise: Promise<void> | null = null;
+const presetEmbeddings = new Map<string, Float32Array>();
+
+// Keep the latest anchor available even before model load completes.
+chrome.storage.local.get(STORAGE_KEYS.ANCHOR).then((stored) => {
+  const anchor = stored[STORAGE_KEYS.ANCHOR];
+  if (typeof anchor === "string" && anchor.trim().length > 0) {
+    currentAnchor = anchor.trim();
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Status
@@ -167,6 +179,7 @@ async function loadEmbeddingModel(): Promise<void> {
       // Embed the anchor phrase
       const anchor = await loadAnchor();
       await setAnchor(anchor);
+      await embedPresetAnchors();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[bg] Embedding model load error:", message);
@@ -380,14 +393,50 @@ function mapScoreToVibe(text: string, score: number) {
   return { text, rawScore: score, status, emoji, colorHSL };
 }
 
-function scoreTexts(texts: string[]) {
-  if (!anchorEmbedding) throw new Error("Anchor not set");
-  return embed(texts).then((embeddings) =>
-    texts.map((text, i) => {
-      const score = cosineSimilarity(anchorEmbedding!, embeddings[i]);
-      return mapScoreToVibe(text, score);
-    })
-  );
+const ANCHOR_TIE_GAP = 0.05;
+const ANCHOR_MIN_SCORE = 0.15;
+
+async function embedPresetAnchors(): Promise<void> {
+  if (!modelReady) return;
+  const vectors = await embed([...PRESET_ANCHORS]);
+  presetEmbeddings.clear();
+  PRESET_ANCHORS.forEach((anchor, i) => {
+    presetEmbeddings.set(anchor, vectors[i]);
+  });
+}
+
+/** Core detection with scores from a pre-computed embedding vector. */
+function detectAnchorsDetailedFromEmbedding(
+  textEmb: Float32Array,
+): { id: string; score: number }[] | undefined {
+  if (presetEmbeddings.size === 0) return undefined;
+
+  const scored = [...presetEmbeddings.entries()]
+    .map(([anchor, emb]) => ({ id: anchor, score: cosineSimilarity(textEmb, emb) }))
+    .sort((a, b) => b.score - a.score);
+
+  const top = scored[0];
+  if (!top || top.score < ANCHOR_MIN_SCORE) return undefined;
+
+  const second = scored[1];
+  if (second && second.score >= ANCHOR_MIN_SCORE && top.score - second.score < ANCHOR_TIE_GAP) {
+    return [top, second];
+  }
+  return [top];
+}
+
+/** Name-only wrapper for SAVE_LABEL and page score cache paths. */
+function detectAnchorsFromEmbedding(textEmb: Float32Array): string[] | undefined {
+  return detectAnchorsDetailedFromEmbedding(textEmb)?.map((a) => a.id);
+}
+
+/** Embed text then detect anchors. Used by SAVE_LABEL path. */
+async function detectAnchors(text: string): Promise<string[] | undefined> {
+  const input = text.replace(/\s+/g, " ").trim();
+  if (!input || !modelReady || presetEmbeddings.size === 0) return undefined;
+
+  const [textEmb] = await embed([input]);
+  return detectAnchorsFromEmbedding(textEmb);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,6 +453,7 @@ async function loadAnchor(): Promise<string> {
 
 async function setAnchor(anchor: string): Promise<void> {
   console.log(`[bg] Setting anchor: "${anchor}"`);
+  currentAnchor = anchor;
   const [emb] = await embed([anchor]);
   anchorEmbedding = emb;
   anchorReady = true;
@@ -457,6 +507,7 @@ interface PageScoreCacheEntry {
   title: string;
   normalizedTitle: string;
   result: VibeResult;
+  detectedAnchors?: string[];
   stale: boolean;
 }
 
@@ -522,19 +573,25 @@ function clearBadge(): void {
   chrome.action.setBadgeText({ text: "" });
 }
 
-/** Sites with content scripts already doing feed-level scoring. */
-const FEED_SCORED_HOSTS = [
+/** Domains with content scripts already doing feed-level scoring. */
+const FEED_SCORED_DOMAINS = [
   "news.ycombinator.com",
-  "www.reddit.com", "old.reddit.com", "new.reddit.com",
-  "x.com", "twitter.com",
+  "reddit.com",
+  "x.com",
+  "twitter.com",
 ];
+
+function isFeedScoredHost(host: string): boolean {
+  return FEED_SCORED_DOMAINS.some(
+    (d) => host === d || host.endsWith("." + d),
+  );
+}
 
 function isScorableUrl(url: string | undefined): boolean {
   if (!url) return false;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return false;
   try {
-    const host = new URL(url).hostname;
-    return !FEED_SCORED_HOSTS.includes(host);
+    return !isFeedScoredHost(new URL(url).hostname);
   } catch {
     return false;
   }
@@ -571,20 +628,29 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
       return existing;
     }
 
-    const [result] = await scoreTexts([norm]);
+    // Single embed call — reuse vector for both main score and anchor detection
+    const [textEmb] = await embed([norm]);
+    const score = cosineSimilarity(anchorEmbedding!, textEmb);
+    const result = mapScoreToVibe(norm, score);
+    const detectedAnchors = detectAnchorsFromEmbedding(textEmb);
+
     const entry: PageScoreCacheEntry = {
       title,
       normalizedTitle: norm,
       result,
+      detectedAnchors,
       stale: false,
     };
     pageScoreCache.set(tabId, entry);
     updateBadge(tabId, result);
 
     // Broadcast to popup
+    const updated: PageScoreUpdatedPayload = {
+      tabId, title, normalizedTitle: norm, result, detectedAnchors, state: "ready",
+    };
     chrome.runtime.sendMessage({
       type: MSG.PAGE_SCORE_UPDATED,
-      payload: { tabId, title, normalizedTitle: norm, result, state: "ready" },
+      payload: updated,
     }).catch(() => {});
 
     return entry;
@@ -683,6 +749,7 @@ chrome.runtime.onMessage.addListener(
         tokenizer = null;
         model = null;
         anchorEmbedding = null;
+        presetEmbeddings.clear();
         modelReady = false;
         anchorReady = false;
         loadingPromise = null;
@@ -706,8 +773,16 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ error: "Model not ready" });
           return;
         }
-        scoreTexts(p.texts)
-          .then((results) => sendResponse({ results }))
+        // Embed once, compute both scores and detected anchors per text
+        embed(p.texts)
+          .then((embeddings) => {
+            const results = p.texts.map((text, i) => {
+              const score = cosineSimilarity(anchorEmbedding!, embeddings[i]);
+              return mapScoreToVibe(text, score);
+            });
+            const detectedAnchors = embeddings.map((emb) => detectAnchorsDetailedFromEmbedding(emb));
+            sendResponse({ results, detectedAnchors });
+          })
           .catch((err) => sendResponse({ error: String(err) }));
         return true; // keep channel open
       }
@@ -732,6 +807,9 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.UPDATE_ANCHOR: {
         const { anchor } = payload as UpdateAnchorPayload;
+        if (anchor) {
+          currentAnchor = anchor;
+        }
         if (anchor && modelReady) {
           anchorReady = false;
           chrome.storage.local.set({ [STORAGE_KEYS.ANCHOR]: anchor });
@@ -746,9 +824,29 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.SAVE_LABEL: {
         const { label } = payload as SaveLabelPayload;
-        enqueueLabelWrite((labels) => { labels.push(label); return labels; })
-          .then(() => sendResponse({ success: true }))
-          .catch((err) => sendResponse({ error: String(err) }));
+        if (!label || typeof label.text !== "string") {
+          sendResponse({ error: "Invalid label payload" });
+          return;
+        }
+        const anchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+
+        (async () => {
+          let detectedAnchors: string[] | undefined;
+          try {
+            detectedAnchors = await detectAnchors(label.text);
+          } catch (err) {
+            console.warn("[bg] Anchor detection failed for label:", err);
+          }
+
+          const stamped: TrainingLabel = {
+            ...label,
+            anchor,
+            ...(detectedAnchors?.length ? { detectedAnchors } : {}),
+          };
+
+          await enqueueLabelWrite((labels) => { labels.push(stamped); return labels; });
+          sendResponse({ success: true });
+        })().catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
 
@@ -776,8 +874,14 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.IMPORT_X_LABELS: {
         const { labels: incoming } = payload as ImportXLabelsPayload;
-        enqueueLabelWrite((labels) => { labels.push(...incoming); return labels; })
-          .then(() => sendResponse({ success: true, count: incoming.length }))
+        const anchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+        const stamped = (Array.isArray(incoming) ? incoming : []).map((label) => ({
+          ...label,
+          anchor,
+          detectedAnchors: undefined,
+        }));
+        enqueueLabelWrite((labels) => { labels.push(...stamped); return labels; })
+          .then(() => sendResponse({ success: true, count: stamped.length }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
@@ -809,6 +913,7 @@ chrome.runtime.onMessage.addListener(
               title: cached.title,
               normalizedTitle: cached.normalizedTitle,
               result: cached.result,
+              detectedAnchors: cached.detectedAnchors,
               state: "ready",
             } as PageScoreResponse);
             return;
@@ -820,6 +925,12 @@ chrome.runtime.onMessage.addListener(
             return;
           }
 
+          // Already scoring this tab — respond "loading" instead of false "unavailable"
+          if (scoringInFlight.has(p.tabId)) {
+            sendResponse({ title: "", normalizedTitle: "", result: null, state: "loading" } as PageScoreResponse);
+            return;
+          }
+
           scorePageTitle(p.tabId)
             .then((entry) => {
               if (entry) {
@@ -827,6 +938,7 @@ chrome.runtime.onMessage.addListener(
                   title: entry.title,
                   normalizedTitle: entry.normalizedTitle,
                   result: entry.result,
+                  detectedAnchors: entry.detectedAnchors,
                   state: "ready",
                 } as PageScoreResponse);
               } else {

@@ -1,5 +1,5 @@
-import { MSG, STORAGE_KEYS } from "../../shared/constants";
-import type { VibeResult } from "../../shared/types";
+import { MSG, STORAGE_KEYS, ANCHOR_LABELS } from "../../shared/constants";
+import type { VibeResult, DetectedAnchor } from "../../shared/types";
 import { scoreToHue, getScoreBand } from "../../shared/scoring-utils";
 import { injectStyles } from "./styles";
 import { createLabelButtons } from "./label-buttons";
@@ -51,6 +51,14 @@ try {
   });
 } catch { /* non-critical */ }
 
+/** Callback invoked when anchor changes — set by each content script to re-score. */
+let onAnchorChanged: (() => void) | null = null;
+
+/** Register a callback that fires when the scoring anchor changes. */
+export function onAnchorChange(callback: () => void): void {
+  onAnchorChanged = callback;
+}
+
 // Live-update when user changes settings in the popup
 chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.SENSITIVITY]) {
@@ -59,6 +67,12 @@ chrome.storage.onChanged.addListener((changes) => {
   }
   if (changes[STORAGE_KEYS.SITE_ENABLED]) {
     siteEnabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue ?? { hn: true, reddit: true, x: true };
+  }
+  if (changes[STORAGE_KEYS.ANCHOR]) {
+    // Anchor changed — clear all scores and re-process
+    clearAppliedScores();
+    resetSiftMarkers();
+    onAnchorChanged?.();
   }
 });
 
@@ -105,7 +119,11 @@ let activeTip: HTMLElement | null = null;
  * Create the score inspector ("?") button. Sends EXPLAIN_SCORE to background
  * and shows a deterministic rationale in a tooltip near the button.
  */
-function createExplainButton(text: string, score: number): HTMLSpanElement {
+function createExplainButton(
+  text: string,
+  score: number,
+  detectedAnchors?: DetectedAnchor[],
+): HTMLSpanElement {
   const btn = document.createElement("span");
   btn.className = "ss-vote ss-explain-btn";
   btn.textContent = "?";
@@ -138,12 +156,45 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
     scorePill.className = "ss-inspector-pill";
     scorePill.textContent = score.toFixed(2);
 
+    header.append(bandPill, scorePill);
+
     const body = document.createElement("div");
     body.className = "ss-inspector-body";
     body.textContent = "Analyzing score\u2026";
 
-    header.append(bandPill, scorePill);
-    tip.append(header, body);
+    tip.append(header);
+
+    // Detected lens pills with scores — own row between header and body
+    if (detectedAnchors?.length) {
+      const stored = await chrome.storage.local.get(STORAGE_KEYS.ANCHOR);
+      const activeAnchor = stored[STORAGE_KEYS.ANCHOR] || "";
+
+      const lensRow = document.createElement("div");
+      lensRow.className = "ss-inspector-lenses";
+      for (const da of detectedAnchors) {
+        const pill = document.createElement("span");
+        pill.className = "ss-inspector-lens";
+        if (da.id === activeAnchor) pill.classList.add("ss-lens-active");
+        pill.textContent = `${ANCHOR_LABELS[da.id] || da.id} ${da.score.toFixed(2)}`;
+        pill.title = `Score with ${ANCHOR_LABELS[da.id] || da.id} lens`;
+        pill.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          chrome.runtime.sendMessage({
+            type: MSG.UPDATE_ANCHOR,
+            payload: { anchor: da.id },
+          });
+          // Update active state across all pills in this row
+          lensRow.querySelectorAll(".ss-inspector-lens").forEach((p) =>
+            p.classList.remove("ss-lens-active"),
+          );
+          pill.classList.add("ss-lens-active");
+        });
+        lensRow.appendChild(pill);
+      }
+      tip.appendChild(lensRow);
+    }
+
+    tip.appendChild(body);
     tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
     tip.style.left = `${rect.left + window.scrollX}px`;
     document.body.appendChild(tip);
@@ -194,6 +245,7 @@ export function applyScore(
   el: HTMLElement,
   voteAnchor?: HTMLElement | null,
   source?: "hn" | "reddit" | "x",
+  detectedAnchors?: DetectedAnchor[],
 ): void {
   injectStyles();
 
@@ -224,7 +276,7 @@ export function applyScore(
   if (source) {
     const anchor = voteAnchor || el;
     const buttons = createLabelButtons(result.text, source);
-    buttons.appendChild(createExplainButton(result.text, score));
+    buttons.appendChild(createExplainButton(result.text, score, detectedAnchors));
     anchor.appendChild(buttons);
   }
 }
