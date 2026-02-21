@@ -14,7 +14,7 @@ import argparse
 from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
-from src.model_trainer import train_with_dataset, get_top_hits, upload_model_to_hub
+from src.model_trainer import train_with_dataset, split_held_out, get_top_hits, upload_model_to_hub
 from src.config import AppConfig
 
 
@@ -203,6 +203,14 @@ def main():
                         help="Serve a converted model dir locally for testing")
     parser.add_argument("--port", type=int, default=8000,
                         help="Port for --serve (default: 8000)")
+    parser.add_argument("--heldout-fraction", type=float, default=0.15,
+                        help="Fraction of triplets held out per anchor (default: 0.15)")
+    parser.add_argument("--heldout-min-anchor-triplets", type=int, default=4,
+                        help="Min triplets per anchor to enable held-out split (default: 4)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for held-out split (default: 42)")
+    parser.add_argument("--debug-search", action="store_true",
+                        help="Print semantic search rankings after training (debug)")
     args = parser.parse_args()
 
     if args.epochs <= 0:
@@ -229,10 +237,25 @@ def main():
         sys.exit(1)
 
     triplets = load_csv(args.csv_path)
-    print(f"Loaded {len(triplets)} training triplets from {args.csv_path}")
-    if len(triplets) < 2:
+    print(f"Loaded {len(triplets)} triplets from {args.csv_path}")
+
+    train_triplets, held_out_groups = split_held_out(
+        triplets,
+        fraction=args.heldout_fraction,
+        min_anchor_triplets=args.heldout_min_anchor_triplets,
+        seed=args.seed,
+    )
+
+    held_out_count = sum(len(g.items) for g in held_out_groups)
+    if held_out_groups:
+        anchors = ", ".join(g.anchor for g in held_out_groups)
+        print(f"Split: {len(train_triplets)} train, {held_out_count} held-out items across {len(held_out_groups)} anchor(s) [{anchors}]")
+    else:
+        print(f"All {len(train_triplets)} triplets used for training (too few per anchor to split)")
+
+    if len(train_triplets) < 2:
         print(
-            "Need at least 2 valid triplets (Anchor,Positive,Negative with non-empty values). "
+            "Need at least 2 training triplets (Anchor,Positive,Negative with non-empty values). "
             "Collect more labels!"
         )
         sys.exit(1)
@@ -244,28 +267,26 @@ def main():
     output_dir = Path(args.output) if args.output else AppConfig.ARTIFACTS_DIR / "sift-finetuned"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    all_titles = list(set([t[1] for t in triplets] + [t[2] for t in triplets]))
-
-    def search_fn():
-        return get_top_hits(model, all_titles, AppConfig.TASK_NAME, AppConfig.QUERY_ANCHOR, top_k=5)
-
-    print(f"\n--- Before training ---")
-    print(search_fn())
-
     print(f"\nTraining with epochs={args.epochs}, lr={args.lr}...")
-    train_with_dataset(
+    taste_tracker = train_with_dataset(
         model,
-        triplets,
+        train_triplets,
         output_dir,
         AppConfig.TASK_NAME,
-        search_fn,
+        held_out_groups=held_out_groups or None,
         epochs=args.epochs,
         learning_rate=args.lr,
     )
 
-    print(f"\n--- After training ---")
-    print(search_fn())
-    print(f"\nPyTorch model saved to: {output_dir}")
+    if taste_tracker:
+        print(taste_tracker.get_final_summary())
+
+    if args.debug_search:
+        all_titles = list({t[1] for t in triplets} | {t[2] for t in triplets})
+        anchors = list({t[0] for t in triplets})
+        for anchor in anchors:
+            print(f"\n--- Debug search: {anchor} ---")
+            print(get_top_hits(model, all_titles, AppConfig.TASK_NAME, anchor, top_k=5))
 
     # Convert to ONNX
     onnx_output = output_dir.parent / f"{output_dir.name}_onnx_transformersjs"
