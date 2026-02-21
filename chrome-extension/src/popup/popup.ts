@@ -2,7 +2,7 @@ import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_LABELS } from "../share
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
-import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload } from "../shared/types";
+import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking } from "../shared/types";
 
 // --- DOM Elements ---
 const statusDot = document.getElementById("status-dot")!;
@@ -471,6 +471,8 @@ clearDataBtn.addEventListener("click", async () => {
 let currentPageTabId = -1;
 let currentPageTitle = "";
 let lastPageState: PageScoreResponse["state"] | "" = "";
+let currentPageRanking: PresetRanking | undefined;
+let currentPageAnchorOverride: string | undefined;
 
 function renderPageScore(resp: PageScoreResponse): void {
   const prevState = lastPageState;
@@ -563,7 +565,7 @@ function renderPageScore(resp: PageScoreResponse): void {
     pageScoreExplain.style.display = "block";
     chrome.runtime.sendMessage({
       type: MSG.EXPLAIN_SCORE,
-      payload: { text: normalizedTitle, score },
+      payload: { text: normalizedTitle, score, anchorId: currentPageRanking?.top.anchor },
     }).then((r) => {
       pageScoreExplain.textContent = r?.explanation || r?.error || "No explanation available.";
     }).catch(() => {
@@ -573,34 +575,58 @@ function renderPageScore(resp: PageScoreResponse): void {
 
   pageScoreActions.append(upBtn, downBtn, explainBtn);
 
-  // Render detected anchor pills (clickable — switches scoring lens)
-  if (resp.detectedAnchors?.length) {
-    const activeAnchor = anchorInput.value;
-    for (const id of resp.detectedAnchors) {
-      const pill = document.createElement("button");
-      pill.className = "page-score-anchor-pill";
-      if (id === activeAnchor) pill.classList.add("active");
-      const label = ANCHOR_LABELS[id] || id;
-      pill.textContent = label;
-      pill.title = `Score with ${label} lens`;
-      pill.addEventListener("click", () => void applyAnchor(id));
-      pageScoreAnchors.appendChild(pill);
+  // Reset override on new page score render
+  currentPageAnchorOverride = undefined;
+  currentPageRanking = resp.ranking;
+
+  // Render detected anchor pills from ranking
+  if (resp.ranking) {
+    const ANCHOR_TIE_GAP = 0.05;
+    const ANCHOR_MIN_SCORE = 0.15;
+    const pills = [resp.ranking.top];
+    const second = resp.ranking.ranks[1];
+    if (second && second.score >= ANCHOR_MIN_SCORE && resp.ranking.confidence < ANCHOR_TIE_GAP) {
+      pills.push(second);
     }
-    pageScoreAnchors.style.display = "flex";
+
+    if (pills.length > 0) {
+      for (const pr of pills) {
+        const pill = document.createElement("button");
+        pill.className = "page-score-anchor-pill";
+        if (pr.anchor === resp.ranking.top.anchor) pill.classList.add("active");
+        const label = ANCHOR_LABELS[pr.anchor] || pr.anchor;
+        pill.textContent = label;
+        pill.title = `Label under ${label}`;
+        pill.addEventListener("click", () => {
+          // Item-level override only — no applyAnchor / UPDATE_ANCHOR
+          currentPageAnchorOverride = pr.anchor;
+          pageScoreAnchors.querySelectorAll(".page-score-anchor-pill").forEach((p) =>
+            p.classList.remove("active"),
+          );
+          pill.classList.add("active");
+        });
+        pageScoreAnchors.appendChild(pill);
+      }
+      pageScoreAnchors.style.display = "flex";
+    }
   }
 }
 
 async function savePageLabel(label: "positive" | "negative"): Promise<void> {
   try {
+    const anchor = currentPageAnchorOverride || currentPageRanking?.top.anchor || "";
     await chrome.runtime.sendMessage({
       type: MSG.SAVE_LABEL,
       payload: {
         label: {
           text: currentPageTitle,
           label,
-          source: "web",
+          source: "web" as const,
           timestamp: Date.now(),
+          anchor,
         },
+        anchorOverride: currentPageAnchorOverride,
+        presetRanking: currentPageRanking,
       },
     });
     await refreshLabelCounts();
