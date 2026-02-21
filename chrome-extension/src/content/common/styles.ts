@@ -15,54 +15,86 @@ export function injectStyles(): void {
 
 const CSS = /* css */ `
 /* ═══════════════════════════════════════════
-   Sift — Ambient Score Styling
-   Prefix: ss-  ·  Zero global leaks
+   Sift — Spectral Fade Score Styling
+   Prefix: ss-  ·  Minimal host layout impact
+   Blue→Amber axis · Two-channel suppression
    ═══════════════════════════════════════════ */
 
-/* ── Pending state while inference is running ── */
+/* ── Pending state: low-contrast shimmer ── */
 .ss-pending {
   position: relative;
-  opacity: 0.72;
 }
 
 .ss-pending::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 2px;
-  border-radius: 99px;
+  inset: 0;
+  border-radius: 2px;
+  pointer-events: none;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    hsla(var(--ss-h, 55), 75%, 50%, 0.9) 50%,
-    transparent 100%
+    transparent 25%,
+    rgba(160, 160, 170, 0.06) 50%,
+    transparent 75%
   );
-  animation: ss-pending-sweep 1.15s linear infinite;
+  background-size: 200% 100%;
+  animation: ss-shimmer 2s ease-in-out infinite;
+  will-change: background-position;
 }
 
-@keyframes ss-pending-sweep {
-  from { transform: translateX(-28%); opacity: 0.4; }
-  to { transform: translateX(28%); opacity: 1; }
+@keyframes ss-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* ── Score indicator — applied to title container ── */
 .ss-scored {
-  border-left: 2px solid hsl(var(--ss-h, 60), 65%, 45%);
+  position: relative;
+  border-left: 3px solid hsl(var(--ss-h, 45), 70%, 48%);
   padding-left: 6px;
   opacity: var(--ss-opacity, 1);
-  transition: opacity 0.3s ease;
-  animation: ss-border-in 0.3s ease-out;
+  filter: saturate(var(--ss-sat, 1));
+  transition: opacity 0.3s ease, filter 0.3s ease;
 }
 
-.ss-scored:hover {
+/* Hover OR keyboard focus-within restores full visibility */
+.ss-scored:hover,
+.ss-scored:focus-within {
   opacity: 1 !important;
+  filter: saturate(1) !important;
 }
 
-@keyframes ss-border-in {
-  from { border-left-width: 0; padding-left: 0; opacity: 0.6; }
-  to   { border-left-width: 2px; padding-left: 6px; }
+/* ── Score chip — inline, works inside any container ── */
+.ss-score-chip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font: 500 9px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  pointer-events: none;
+  color: hsl(var(--ss-h, 45), 30%, 40%);
+  background: hsla(var(--ss-h, 45), 40%, 50%, 0.08);
+  border: 1px solid hsla(var(--ss-h, 45), 30%, 50%, 0.15);
+  transition: opacity 0.2s ease;
+}
+
+/* HIGH (>=0.80): always visible */
+.ss-score-chip[data-band="HIGH"] {
+  opacity: 0.8;
+}
+
+/* GOOD (0.50-0.79): visible on hover/focus only */
+.ss-score-chip[data-band="GOOD"] {
+  opacity: 0;
+}
+
+.ss-scored:hover .ss-score-chip[data-band="GOOD"],
+.ss-scored:focus-within .ss-score-chip[data-band="GOOD"] {
+  opacity: 0.7;
 }
 
 /* ── Vote buttons — hidden until hover ── */
@@ -251,10 +283,46 @@ const CSS = /* css */ `
   50% { opacity: 0.55; }
 }
 
+/* ── Accessibility: reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .ss-pending::after {
+    animation: none;
+  }
+  .ss-vote.ss-pop {
+    animation: none;
+  }
+  .ss-explain-tip {
+    animation: none;
+  }
+  .ss-scored {
+    transition: none;
+  }
+}
+
+/* ── Accessibility: high contrast ── */
+@media (prefers-contrast: more) {
+  .ss-scored {
+    border-left-width: 4px;
+    filter: saturate(1) !important;
+  }
+  .ss-score-chip {
+    border-width: 2px;
+    font-weight: 700;
+  }
+  .ss-score-chip[data-band="GOOD"] {
+    opacity: 0.8;
+  }
+}
+
 /* ── Dark page adaptation ── */
 @media (prefers-color-scheme: dark) {
   .ss-scored {
-    border-left-color: hsl(var(--ss-h, 60), 60%, 55%);
+    border-left-color: hsl(var(--ss-h, 45), 60%, 58%);
+  }
+  .ss-score-chip {
+    color: hsl(var(--ss-h, 45), 25%, 70%);
+    background: hsla(var(--ss-h, 45), 30%, 50%, 0.12);
+    border-color: hsla(var(--ss-h, 45), 25%, 50%, 0.2);
   }
   .ss-explain-btn {
     color: hsl(var(--ss-h, 0), 12%, 62%);

@@ -62,26 +62,38 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 /**
- * Compute opacity from raw score and sensitivity.
+ * Two-channel suppression: opacity + desaturation.
  *
- * sensitivity 0:   everything at full opacity (no dimming)
- * sensitivity 50:  moderate — low scores ~0.5, high scores ~1.0
- * sensitivity 100: extreme — low scores ~0.15, only top stays bright
+ * sensitivity 0:   no suppression at all
+ * sensitivity 1-49: opacity only (floor 0.45)
+ * sensitivity 50-100: opacity (floor 0.40) + desaturation
  */
-function computeOpacity(score: number): number {
+function computeSuppression(score: number): { opacity: number; saturate: number } {
   const s = sensitivity / 100; // normalize to 0-1
-  // Linear dim: opacity = 1 - s * (1 - score)
-  // At s=0: always 1. At s=1: opacity equals score.
-  const raw = 1.0 - s * (1.0 - score);
-  return Math.max(0.15, Math.min(1.0, raw));
+
+  // Opacity: linear dim with safe floor for text readability
+  const opacityFloor = s >= 0.5 ? 0.40 : 0.45;
+  const opacity = Math.max(opacityFloor, Math.min(1.0, 1.0 - s * (1.0 - score)));
+
+  // Desaturation: only above sensitivity 50
+  let saturate = 1.0;
+  if (s >= 0.5) {
+    const desatStrength = (s - 0.5) / 0.5; // 0→1 as sensitivity goes 50→100
+    saturate = 1.0 - desatStrength * (1.0 - score); // low scores get more desaturated
+    saturate = Math.max(0.3, Math.min(1.0, saturate));
+  }
+
+  return { opacity, saturate };
 }
 
 function applySensitivityToExistingScores(): void {
   document.querySelectorAll<HTMLElement>(".ss-scored").forEach((el) => {
     const score = Number(el.dataset.siftScore);
     if (!Number.isFinite(score)) return;
-    const opacity = computeOpacity(Math.max(0, Math.min(1, score)));
+    const clamped = Math.max(0, Math.min(1, score));
+    const { opacity, saturate } = computeSuppression(clamped);
     el.style.setProperty("--ss-opacity", String(opacity));
+    el.style.setProperty("--ss-sat", String(saturate));
   });
 }
 
@@ -127,19 +139,19 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
     const header = document.createElement("div");
     header.className = "ss-inspector-head";
 
-    const scorePill = document.createElement("span");
-    scorePill.className = "ss-inspector-pill";
-    scorePill.textContent = `${Math.round(score * 100)}%`;
-
     const bandPill = document.createElement("span");
     bandPill.className = "ss-inspector-pill ss-inspector-band";
     bandPill.textContent = getScoreBand(score);
+
+    const scorePill = document.createElement("span");
+    scorePill.className = "ss-inspector-pill";
+    scorePill.textContent = score.toFixed(2);
 
     const body = document.createElement("div");
     body.className = "ss-inspector-body";
     body.textContent = "Analyzing score\u2026";
 
-    header.append(scorePill, bandPill);
+    header.append(bandPill, scorePill);
     tip.append(header, body);
     tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
     tip.style.left = `${rect.left + window.scrollX}px`;
@@ -180,9 +192,24 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
 }
 
 /**
+ * Blue→amber hue from score.
+ * 0.0→210 (blue), 0.5→45 (gold), 1.0→30 (amber).
+ * Colorblind-safe: avoids red-green axis entirely.
+ */
+function scoreToHue(score: number): number {
+  if (score < 0.5) {
+    // 210 (blue) → 45 (gold)
+    return 210 - (210 - 45) * (score / 0.5);
+  }
+  // 45 (gold) → 30 (amber)
+  return 45 - (45 - 30) * ((score - 0.5) / 0.5);
+}
+
+/**
  * Apply Sift ambient styling to an existing page element.
- * - Colored left bar (red → green proportional to score)
- * - Dims low-scoring items based on sensitivity setting
+ * - Blue→amber accent mark (::before, zero layout shift)
+ * - Two-channel suppression: opacity + desaturation
+ * - Score chip for HIGH (always) / GOOD (hover) bands
  * - Vote buttons + inspector button appear on hover (if source provided)
  */
 export function applyScore(
@@ -194,17 +221,28 @@ export function applyScore(
   injectStyles();
 
   const score = Math.max(0, Math.min(1, result.rawScore));
-  const hue = Math.floor(score * 120); // 0 red → 60 amber → 120 green
-  const opacity = computeOpacity(score);
+  const hue = Math.round(scoreToHue(score));
+  const { opacity, saturate } = computeSuppression(score);
 
   el.style.setProperty("--ss-h", String(hue));
   el.style.setProperty("--ss-opacity", String(opacity));
+  el.style.setProperty("--ss-sat", String(saturate));
   el.dataset.siftScore = String(score);
 
   // Guard: only create controls once per element
   if (el.classList.contains("ss-scored")) return;
 
   el.classList.add("ss-scored");
+
+  // Score chip for HIGH / GOOD bands — inline, attached to visual anchor
+  const band = getScoreBand(score);
+  if (band === "HIGH" || band === "GOOD") {
+    const chip = document.createElement("span");
+    chip.className = "ss-score-chip";
+    chip.dataset.band = band;
+    chip.textContent = `${band} ${score.toFixed(2)}`;
+    (voteAnchor || el).appendChild(chip);
+  }
 
   if (source) {
     const anchor = voteAnchor || el;
@@ -219,10 +257,11 @@ export function clearAppliedScores(): void {
     el.classList.remove("ss-scored");
     el.style.removeProperty("--ss-h");
     el.style.removeProperty("--ss-opacity");
+    el.style.removeProperty("--ss-sat");
     delete el.dataset.siftScore;
   });
 
-  document.querySelectorAll(".ss-votes").forEach((el) => el.remove());
+  document.querySelectorAll(".ss-votes, .ss-score-chip").forEach((el) => el.remove());
 
   if (activeTip) {
     activeTip.remove();
