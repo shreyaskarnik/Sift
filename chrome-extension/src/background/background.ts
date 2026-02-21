@@ -25,6 +25,7 @@ import {
 import type {
   ExtensionMessage,
   ModelStatus,
+  VibeResult,
   TrainingLabel,
   SaveLabelPayload,
   UpdateAnchorPayload,
@@ -32,7 +33,10 @@ import type {
   SetLabelsPayload,
   ScoreTextsPayload,
   ExplainScorePayload,
+  GetPageScorePayload,
+  PageScoreResponse,
 } from "../shared/types";
+import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
 
 // ---------------------------------------------------------------------------
 // Env config
@@ -404,6 +408,14 @@ async function setAnchor(anchor: string): Promise<void> {
   anchorEmbedding = emb;
   anchorReady = true;
   console.log("[bg] Anchor embedded");
+
+  // Mark all page score cache entries stale; rescore active tab immediately
+  if (pageScoringEnabled) {
+    for (const entry of pageScoreCache.values()) {
+      entry.stale = true;
+    }
+    if (activeTabId > 0) void scorePageTitle(activeTabId);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +448,207 @@ function enqueueLabelWrite(
     });
   return labelWriteQueue;
 }
+
+// ---------------------------------------------------------------------------
+// Page scoring — badge + per-tab cache
+// ---------------------------------------------------------------------------
+
+interface PageScoreCacheEntry {
+  title: string;
+  normalizedTitle: string;
+  result: VibeResult;
+  stale: boolean;
+}
+
+const pageScoreCache = new Map<number, PageScoreCacheEntry>();
+const scoringInFlight = new Set<number>(); // dedupe concurrent scorePageTitle calls
+let pageScoringEnabled = false;
+let activeTabId = -1;
+
+// Load initial state + bootstrap scoring if already enabled on wake
+Promise.all([
+  chrome.storage.local.get(STORAGE_KEYS.PAGE_SCORING_ENABLED),
+  chrome.tabs.query({ active: true, currentWindow: true }),
+]).then(([stored, tabs]) => {
+  pageScoringEnabled = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] === true;
+  if (tabs[0]?.id) activeTabId = tabs[0].id;
+  // If enabled on wake and model is already loaded, score active tab.
+  // If model isn't loaded yet, setAnchor() at end of loadModels() will trigger it.
+  if (pageScoringEnabled && activeTabId > 0 && modelReady && anchorReady) {
+    void scorePageTitle(activeTabId);
+  }
+});
+
+/** Convert HSL (h: 0-360, s/l: 0-1) to [r, g, b, a] for badge API. */
+function hslToRgb(h: number, s: number, l: number): [number, number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255),
+    255,
+  ];
+}
+
+/** Set badge text + color for a tab. Only updates if it's the active tab. */
+function updateBadge(tabId: number, result: VibeResult | null): void {
+  if (tabId !== activeTabId) return;
+
+  if (!result || !pageScoringEnabled) {
+    chrome.action.setBadgeText({ text: "" });
+    return;
+  }
+
+  const score = Math.max(0, Math.min(1, result.rawScore));
+  const text = String(Math.round(score * 100));
+  const hue = scoreToHue(score);
+  const color = hslToRgb(hue, 0.7, 0.45);
+
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color });
+}
+
+/** Clear badge (e.g. when feature is disabled or on non-scorable page). */
+function clearBadge(): void {
+  chrome.action.setBadgeText({ text: "" });
+}
+
+/** Sites with content scripts already doing feed-level scoring. */
+const FEED_SCORED_HOSTS = [
+  "news.ycombinator.com",
+  "www.reddit.com", "old.reddit.com", "new.reddit.com",
+  "x.com", "twitter.com",
+];
+
+function isScorableUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return false;
+  try {
+    const host = new URL(url).hostname;
+    return !FEED_SCORED_HOSTS.includes(host);
+  } catch {
+    return false;
+  }
+}
+
+/** Score a tab's title and cache the result. Returns the cache entry. */
+async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null> {
+  // In-flight dedup: if already scoring this tab, skip
+  if (scoringInFlight.has(tabId)) return pageScoreCache.get(tabId) ?? null;
+  scoringInFlight.add(tabId);
+
+  try {
+    let tab: chrome.tabs.Tab;
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch {
+      return null; // tab closed
+    }
+
+    // Evict cache + clear badge for non-scorable pages
+    if (!tab.title || !isScorableUrl(tab.url)) {
+      pageScoreCache.delete(tabId);
+      if (tabId === activeTabId) clearBadge();
+      return null;
+    }
+    if (!modelReady || !anchorReady) return null;
+
+    const title = tab.title;
+    const norm = normalizeTitle(title);
+
+    // Dedup: skip if same normalized title is already cached and not stale
+    const existing = pageScoreCache.get(tabId);
+    if (existing && existing.normalizedTitle === norm && !existing.stale) {
+      return existing;
+    }
+
+    const [result] = await scoreTexts([norm]);
+    const entry: PageScoreCacheEntry = {
+      title,
+      normalizedTitle: norm,
+      result,
+      stale: false,
+    };
+    pageScoreCache.set(tabId, entry);
+    updateBadge(tabId, result);
+
+    // Broadcast to popup
+    chrome.runtime.sendMessage({
+      type: MSG.PAGE_SCORE_UPDATED,
+      payload: { tabId, title, normalizedTitle: norm, result, state: "ready" },
+    }).catch(() => {});
+
+    return entry;
+  } catch (err) {
+    console.error("[bg] Page score failed:", err);
+    return null;
+  } finally {
+    scoringInFlight.delete(tabId);
+  }
+}
+
+// --- Tab listeners (always registered, gated by pageScoringEnabled) ---
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!pageScoringEnabled) return;
+  if (changeInfo.status !== "complete") return;
+  if (!isScorableUrl(tab.url)) {
+    // Evict stale cache from previous page on this tab
+    pageScoreCache.delete(tabId);
+    if (tabId === activeTabId) clearBadge();
+    return;
+  }
+  // Fire-and-forget score
+  void scorePageTitle(tabId);
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  activeTabId = tabId;
+  if (!pageScoringEnabled) {
+    clearBadge();
+    return;
+  }
+
+  // Always validate via scorePageTitle — it checks the tab's current URL
+  // and evicts cache if non-scorable. Cached + fresh entries short-circuit
+  // inside scorePageTitle without hitting the model.
+  const cached = pageScoreCache.get(tabId);
+  if (cached && !cached.stale) {
+    updateBadge(tabId, cached.result);
+  } else {
+    clearBadge();
+  }
+  // Score (or validate + evict) regardless — scorePageTitle handles all cases
+  void scorePageTitle(tabId);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  pageScoreCache.delete(tabId);
+});
+
+// Listen for page scoring toggle changes
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes[STORAGE_KEYS.PAGE_SCORING_ENABLED]) {
+    pageScoringEnabled = changes[STORAGE_KEYS.PAGE_SCORING_ENABLED].newValue === true;
+    if (!pageScoringEnabled) {
+      // Disable: clear all badges and cache
+      pageScoreCache.clear();
+      clearBadge();
+    } else if (modelReady && anchorReady) {
+      // Enable: score active tab immediately
+      void scorePageTitle(activeTabId);
+    }
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Model initialization — runs every time the service worker starts.
@@ -567,6 +780,71 @@ chrome.runtime.onMessage.addListener(
           .then(() => sendResponse({ success: true, count: incoming.length }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
+      }
+
+      case MSG.GET_PAGE_SCORE: {
+        const p = payload as GetPageScorePayload;
+        if (!p?.tabId) {
+          sendResponse({ title: "", normalizedTitle: "", result: null, state: "unavailable" } as PageScoreResponse);
+          return;
+        }
+
+        if (!pageScoringEnabled) {
+          sendResponse({ title: "", normalizedTitle: "", result: null, state: "disabled" } as PageScoreResponse);
+          return;
+        }
+
+        // Validate tab URL before trusting cache — tab may have navigated to chrome:// etc.
+        chrome.tabs.get(p.tabId).then((tab) => {
+          if (!isScorableUrl(tab.url)) {
+            pageScoreCache.delete(p.tabId);
+            sendResponse({ title: "", normalizedTitle: "", result: null, state: "unavailable" } as PageScoreResponse);
+            return;
+          }
+
+          // Return from cache if fresh and title matches current tab
+          const cached = pageScoreCache.get(p.tabId);
+          if (cached && !cached.stale && cached.title === tab.title) {
+            sendResponse({
+              title: cached.title,
+              normalizedTitle: cached.normalizedTitle,
+              result: cached.result,
+              state: "ready",
+            } as PageScoreResponse);
+            return;
+          }
+
+          // Fetch-or-score: try scoring on demand
+          if (!modelReady || !anchorReady) {
+            sendResponse({ title: "", normalizedTitle: "", result: null, state: "loading" } as PageScoreResponse);
+            return;
+          }
+
+          scorePageTitle(p.tabId)
+            .then((entry) => {
+              if (entry) {
+                sendResponse({
+                  title: entry.title,
+                  normalizedTitle: entry.normalizedTitle,
+                  result: entry.result,
+                  state: "ready",
+                } as PageScoreResponse);
+              } else {
+                sendResponse({ title: "", normalizedTitle: "", result: null, state: "unavailable" } as PageScoreResponse);
+              }
+            })
+            .catch(() => {
+              sendResponse({ title: "", normalizedTitle: "", result: null, state: "unavailable" } as PageScoreResponse);
+            });
+        }).catch(() => {
+          sendResponse({ title: "", normalizedTitle: "", result: null, state: "unavailable" } as PageScoreResponse);
+        });
+        return true; // keep channel open
+      }
+
+      case MSG.PAGE_SCORE_UPDATED: {
+        // Ignore — we are the source
+        break;
       }
 
       case MSG.MODEL_STATUS: {

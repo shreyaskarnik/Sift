@@ -20,81 +20,105 @@
   </header>
 
   <div class="popup-body">
-    <section id="model-section">
-      <h2>Models</h2>
-      <div class="model-row">
-        <span class="model-name">Scoring</span>
-        <span id="model-status" class="model-detail">Initializing...</span>
-      </div>
-      <div id="model-id-display" class="model-id-display"></div>
-      <div id="progress-bar-container" style="display:none">
-        <div id="progress-bar"></div>
-      </div>
-    </section>
-
-    <section id="settings-section">
-      <h2>Settings</h2>
-      <label>Active Sites</label>
-      <div class="toggle-row">
-        <label class="toggle"><input type="checkbox" id="toggle-hn" checked><span class="toggle-switch"></span> HN</label>
-        <label class="toggle"><input type="checkbox" id="toggle-reddit" checked><span class="toggle-switch"></span> Reddit</label>
-        <label class="toggle"><input type="checkbox" id="toggle-x" checked><span class="toggle-switch"></span> X</label>
-      </div>
-      <label>Scoring Lens</label>
-      <div class="lens-active" id="lens-active">
-        <span class="lens-icon">◎</span>
-        <span class="lens-text" id="lens-text">News / Social Feed</span>
-        <button class="lens-edit-btn" id="lens-edit-btn" title="Change lens">✎</button>
-      </div>
-      <div class="lens-editor" id="lens-editor" style="display:none">
-        <div class="lens-presets" id="lens-presets">
-          <button class="lens-chip" data-anchor="MY_FAVORITE_NEWS" data-label="News / Social Feed">News / Social Feed</button>
-          <button class="lens-chip" data-anchor="AI_RESEARCH" data-label="AI Research">AI Research</button>
-          <button class="lens-chip" data-anchor="STARTUP_NEWS" data-label="Startups">Startups</button>
-          <button class="lens-chip" data-anchor="DEEP_TECH" data-label="Deep Tech">Deep Tech</button>
-          <button class="lens-chip" data-anchor="SCIENCE_DISCOVERIES" data-label="Science">Science</button>
-        </div>
-        <div class="lens-custom">
-          <span class="lens-custom-label">Custom</span>
-          <div class="input-row">
-            <input type="text" id="anchor-input" placeholder="YOUR_CUSTOM_ANCHOR">
-            <button id="save-anchor">Set</button>
-          </div>
-        </div>
-      </div>
-      <label for="sensitivity-slider">Dimming <span id="sensitivity-value" class="slider-value">50%</span></label>
-      <div class="slider-row">
-        <span class="slider-hint">Subtle</span>
-        <input type="range" id="sensitivity-slider" min="0" max="100" value="50">
-        <span class="slider-hint">Aggressive</span>
-      </div>
-      <label for="model-source-input">Model Source <small>(blank = default)</small></label>
-      <div class="input-row">
-        <input type="text" id="model-source-input" placeholder="org/model-ONNX or http://localhost:8000">
-        <button id="save-model-source">Apply</button>
-      </div>
-    </section>
-
-    <section id="data-section">
-      <h2>Training Data</h2>
-      <div id="label-counts">No labels collected yet.</div>
-      <div id="data-readiness" class="data-readiness"></div>
-      <a id="collect-link" class="collect-link" href="https://news.ycombinator.com/" target="_blank" rel="noreferrer">
-        Open an enabled site to collect labels
-      </a>
-      <div class="button-group">
-        <button id="export-csv">Export CSV</button>
-        <label class="file-input-label" for="import-x">
-          Import X Archive
-          <input type="file" id="import-x" accept=".js" multiple style="display:none">
+    <div class="hero-card">
+      <div class="hero-header">
+        <span class="hero-label">🧭 Current Page</span>
+        <label class="toggle toggle-compact">
+          <input type="checkbox" id="toggle-page-score">
+          <span class="toggle-switch"></span>
         </label>
       </div>
-      <button id="clear-data" class="danger">Clear All Data</button>
-    </section>
+      <div id="page-score-card" class="page-score-card disabled">
+        <div class="page-score-title" id="page-score-title">Enable scoring to see page relevance</div>
+        <div class="page-score-row" id="page-score-row" style="display:none">
+          <span class="page-score-band" id="page-score-band"></span>
+          <span class="page-score-value" id="page-score-value"></span>
+          <span class="page-score-actions" id="page-score-actions"></span>
+        </div>
+        <div class="page-score-explain" id="page-score-explain" style="display:none"></div>
+      </div>
+    </div>
 
-    <footer>
-      <p>Sift through the noise — powered by EmbeddingGemma.</p>
-    </footer>
+    <details class="fold fold-settings">
+      <summary>⚙️ Settings</summary>
+      <div class="fold-content">
+        <section id="model-section">
+          <div class="model-row">
+            <span class="model-name">Scoring</span>
+            <span id="model-status" class="model-detail">Initializing...</span>
+          </div>
+          <div id="model-id-display" class="model-id-display"></div>
+          <div id="progress-bar-container" style="display:none">
+            <div id="progress-bar"></div>
+          </div>
+        </section>
+
+        <section id="settings-section">
+          <label>🌐 Active Sites</label>
+          <div class="toggle-row">
+            <label class="toggle"><input type="checkbox" id="toggle-hn" checked><span class="toggle-switch"></span> HN</label>
+            <label class="toggle"><input type="checkbox" id="toggle-reddit" checked><span class="toggle-switch"></span> Reddit</label>
+            <label class="toggle"><input type="checkbox" id="toggle-x" checked><span class="toggle-switch"></span> X</label>
+          </div>
+          <label>🔎 Scoring Lens</label>
+          <div class="lens-active" id="lens-active">
+            <span class="lens-icon">◎</span>
+            <span class="lens-text" id="lens-text">News / Social Feed</span>
+            <button class="lens-edit-btn" id="lens-edit-btn" title="Change lens">✎</button>
+          </div>
+          <div class="lens-editor" id="lens-editor" style="display:none">
+            <div class="lens-presets" id="lens-presets">
+              <button class="lens-chip" data-anchor="MY_FAVORITE_NEWS" data-label="News / Social Feed">News / Social Feed</button>
+              <button class="lens-chip" data-anchor="AI_RESEARCH" data-label="AI Research">AI Research</button>
+              <button class="lens-chip" data-anchor="STARTUP_NEWS" data-label="Startups">Startups</button>
+              <button class="lens-chip" data-anchor="DEEP_TECH" data-label="Deep Tech">Deep Tech</button>
+              <button class="lens-chip" data-anchor="SCIENCE_DISCOVERIES" data-label="Science">Science</button>
+            </div>
+            <div class="lens-custom">
+              <span class="lens-custom-label">Custom</span>
+              <div class="input-row">
+                <input type="text" id="anchor-input" placeholder="YOUR_CUSTOM_ANCHOR">
+                <button id="save-anchor">Set</button>
+              </div>
+            </div>
+          </div>
+          <label for="sensitivity-slider">Dimming <span id="sensitivity-value" class="slider-value">50%</span></label>
+          <div class="slider-row">
+            <span class="slider-hint">Subtle</span>
+            <input type="range" id="sensitivity-slider" min="0" max="100" value="50">
+            <span class="slider-hint">Aggressive</span>
+          </div>
+          <label for="model-source-input">🤖 Model Source <small>(blank = default)</small></label>
+          <div class="input-row">
+            <input type="text" id="model-source-input" placeholder="org/model-ONNX or http://localhost:8000">
+            <button id="save-model-source">Apply</button>
+          </div>
+        </section>
+
+        <footer>
+          <p>Sift through the noise — powered by EmbeddingGemma.</p>
+        </footer>
+      </div>
+    </details>
+
+    <details class="fold fold-data">
+      <summary>🧪 Training Data <span id="label-count-badge" class="fold-badge"></span></summary>
+      <div class="fold-content">
+        <div id="label-counts">No labels collected yet.</div>
+        <div id="data-readiness" class="data-readiness"></div>
+        <a id="collect-link" class="collect-link" href="https://news.ycombinator.com/" target="_blank" rel="noreferrer">
+          Open an enabled site to collect labels
+        </a>
+        <div class="button-group">
+          <button id="export-csv">Export CSV</button>
+          <label class="file-input-label" for="import-x">
+            Import X Archive
+            <input type="file" id="import-x" accept=".js" multiple style="display:none">
+          </label>
+        </div>
+        <button id="clear-data" class="danger">Clear All Data</button>
+      </div>
+    </details>
   </div>
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
   <script src="popup.js"></script>

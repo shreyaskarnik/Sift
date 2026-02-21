@@ -1,5 +1,6 @@
-import { MSG, STORAGE_KEYS, VIBE_THRESHOLDS } from "../../shared/constants";
+import { MSG, STORAGE_KEYS } from "../../shared/constants";
 import type { VibeResult } from "../../shared/types";
+import { scoreToHue, getScoreBand } from "../../shared/scoring-utils";
 import { injectStyles } from "./styles";
 import { createLabelButtons } from "./label-buttons";
 
@@ -100,16 +101,6 @@ function applySensitivityToExistingScores(): void {
 /** Track the active tooltip so only one shows at a time */
 let activeTip: HTMLElement | null = null;
 
-function getScoreBand(score: number): string {
-  const clamped = Math.max(0, Math.min(1, score));
-  for (const threshold of VIBE_THRESHOLDS) {
-    if (clamped >= threshold.score) {
-      return threshold.status.replace("VIBE:", "");
-    }
-  }
-  return "LOW";
-}
-
 /**
  * Create the score inspector ("?") button. Sends EXPLAIN_SCORE to background
  * and shows a deterministic rationale in a tooltip near the button.
@@ -189,20 +180,6 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
   });
 
   return btn;
-}
-
-/**
- * Blue→amber hue from score.
- * 0.0→210 (blue), 0.5→45 (gold), 1.0→30 (amber).
- * Colorblind-safe: avoids red-green axis entirely.
- */
-function scoreToHue(score: number): number {
-  if (score < 0.5) {
-    // 210 (blue) → 45 (gold)
-    return 210 - (210 - 45) * (score / 0.5);
-  }
-  // 45 (gold) → 30 (amber)
-  return 45 - (45 - 30) * ((score - 0.5) / 0.5);
 }
 
 /**

@@ -1,7 +1,8 @@
 import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR } from "../shared/constants";
+import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
-import type { TrainingLabel, ModelStatus } from "../shared/types";
+import type { TrainingLabel, ModelStatus, PageScoreResponse } from "../shared/types";
 
 // --- DOM Elements ---
 const statusDot = document.getElementById("status-dot")!;
@@ -31,6 +32,16 @@ const modelSourceInput = document.getElementById("model-source-input") as HTMLIn
 const saveModelSourceBtn = document.getElementById("save-model-source") as HTMLButtonElement;
 const modelIdDisplay = document.getElementById("model-id-display")!;
 const toastContainer = document.getElementById("toast-container")!;
+const togglePageScore = document.getElementById("toggle-page-score") as HTMLInputElement;
+const heroCard = document.querySelector(".hero-card") as HTMLElement;
+const pageScoreCard = document.getElementById("page-score-card")!;
+const pageScoreTitle = document.getElementById("page-score-title")!;
+const pageScoreRow = document.getElementById("page-score-row")!;
+const pageScoreBand = document.getElementById("page-score-band")!;
+const pageScoreValue = document.getElementById("page-score-value")!;
+const pageScoreActions = document.getElementById("page-score-actions")!;
+const pageScoreExplain = document.getElementById("page-score-explain")!;
+const labelCountBadge = document.getElementById("label-count-badge")!;
 
 interface LabelStats {
   total: number;
@@ -40,6 +51,7 @@ interface LabelStats {
   reddit: number;
   x: number;
   xImport: number;
+  web: number;
 }
 
 const EMPTY_STATS: LabelStats = {
@@ -50,6 +62,7 @@ const EMPTY_STATS: LabelStats = {
   reddit: 0,
   x: 0,
   xImport: 0,
+  web: 0,
 };
 
 let lastLabelStats: LabelStats = EMPTY_STATS;
@@ -103,6 +116,7 @@ function summarizeLabels(labels: TrainingLabel[]): LabelStats {
     reddit: labels.filter((l) => l.source === "reddit").length,
     x: labels.filter((l) => l.source === "x").length,
     xImport: labels.filter((l) => l.source === "x-import").length,
+    web: labels.filter((l) => l.source === "web").length,
   };
 }
 
@@ -154,6 +168,7 @@ async function init() {
     STORAGE_KEYS.CUSTOM_MODEL_URL,
     STORAGE_KEYS.SENSITIVITY,
     STORAGE_KEYS.SITE_ENABLED,
+    STORAGE_KEYS.PAGE_SCORING_ENABLED,
   ]);
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
@@ -173,6 +188,8 @@ async function init() {
   toggleReddit.checked = sites.reddit !== false;
   toggleX.checked = sites.x !== false;
 
+  togglePageScore.checked = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] === true;
+
   // Get model status
   try {
     const response = await chrome.runtime.sendMessage({ type: MSG.GET_STATUS });
@@ -183,6 +200,9 @@ async function init() {
 
   // Load label counts
   await refreshLabelCounts();
+
+  // Load page score for current tab
+  await loadPageScore();
 }
 
 function updateModelStatus(status: ModelStatus) {
@@ -221,21 +241,27 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
     const stats = summarizeLabels(labels);
     lastLabelStats = stats;
 
+    // Update fold badge
+    labelCountBadge.textContent = stats.total > 0 ? `${stats.total}` : "";
+
     if (stats.total === 0) {
       labelCounts.textContent = "No labels collected yet.";
       updateDataReadiness(stats);
       return labels;
     }
 
+    const sources = [`HN: ${stats.hn}`, `Reddit: ${stats.reddit}`, `X: ${stats.x}`, `Import: ${stats.xImport}`];
+    if (stats.web > 0) sources.push(`Web: ${stats.web}`);
     labelCounts.textContent =
       `Total: ${stats.total} (${stats.pos} positive, ${stats.neg} negative)\n` +
-      `HN: ${stats.hn} | Reddit: ${stats.reddit} | X: ${stats.x} | Import: ${stats.xImport}`;
+      sources.join(" | ");
 
     updateDataReadiness(stats);
     return labels;
   } catch {
     labelCounts.textContent = "Unable to load label data.";
     lastLabelStats = EMPTY_STATS;
+    labelCountBadge.textContent = "";
     updateDataReadiness(lastLabelStats);
     return [];
   }
@@ -430,10 +456,168 @@ clearDataBtn.addEventListener("click", async () => {
   });
 });
 
+// --- Page score ---
+
+let currentPageTabId = -1;
+let currentPageTitle = "";
+let lastPageState: PageScoreResponse["state"] | "" = "";
+
+function renderPageScore(resp: PageScoreResponse): void {
+  const prevState = lastPageState;
+  lastPageState = resp.state;
+
+  pageScoreCard.classList.remove("disabled", "loading");
+  heroCard.classList.remove("is-ready", "is-disabled", "is-loading", "is-unavailable");
+  pageScoreExplain.style.display = "none";
+
+  if (resp.state === "disabled") {
+    pageScoreCard.classList.add("disabled");
+    heroCard.classList.add("is-disabled");
+    pageScoreTitle.textContent = "Enable scoring to see page relevance";
+    pageScoreRow.style.display = "none";
+    return;
+  }
+
+  if (resp.state === "loading") {
+    pageScoreCard.classList.add("loading");
+    heroCard.classList.add("is-loading");
+    pageScoreTitle.textContent = "Scoring page...";
+    pageScoreRow.style.display = "none";
+    return;
+  }
+
+  if (resp.state === "unavailable" || !resp.result) {
+    pageScoreCard.classList.add("disabled");
+    heroCard.classList.add("is-unavailable");
+    heroCard.style.removeProperty("--ps-hue");
+    pageScoreTitle.textContent = "Not available for this page";
+    pageScoreRow.style.display = "none";
+    return;
+  }
+
+  // Ready state — show score
+  heroCard.classList.add("is-ready");
+  const { result, normalizedTitle } = resp;
+  const score = Math.max(0, Math.min(1, result.rawScore));
+  const hue = Math.round(scoreToHue(score));
+  const band = getScoreBand(score);
+
+  currentPageTitle = normalizedTitle;
+  heroCard.style.setProperty("--ps-hue", String(hue));
+  pageScoreTitle.textContent = normalizedTitle;
+  pageScoreBand.textContent = band;
+  pageScoreValue.textContent = score.toFixed(2);
+
+  // Only animate the reveal on meaningful transitions (not ready→ready re-renders)
+  if (prevState !== "ready") {
+    pageScoreRow.style.display = "none";
+    // Force reflow so animation restarts
+    void pageScoreRow.offsetHeight;
+  }
+  pageScoreRow.style.display = "flex";
+
+  // Build action buttons — clear existing first
+  while (pageScoreActions.firstChild) {
+    pageScoreActions.removeChild(pageScoreActions.firstChild);
+  }
+
+  const upBtn = document.createElement("button");
+  upBtn.textContent = "\uD83D\uDC4D";
+  upBtn.title = "Positive label";
+  upBtn.addEventListener("click", () => {
+    void savePageLabel("positive");
+    upBtn.classList.add("voted");
+    downBtn.classList.remove("voted");
+  });
+
+  const downBtn = document.createElement("button");
+  downBtn.textContent = "\uD83D\uDC4E";
+  downBtn.title = "Negative label";
+  downBtn.addEventListener("click", () => {
+    void savePageLabel("negative");
+    downBtn.classList.add("voted");
+    upBtn.classList.remove("voted");
+  });
+
+  const explainBtn = document.createElement("button");
+  explainBtn.textContent = "?";
+  explainBtn.title = "Inspect score";
+  explainBtn.addEventListener("click", () => {
+    if (pageScoreExplain.style.display !== "none") {
+      pageScoreExplain.style.display = "none";
+      return;
+    }
+    pageScoreExplain.textContent = "Analyzing...";
+    pageScoreExplain.style.display = "block";
+    chrome.runtime.sendMessage({
+      type: MSG.EXPLAIN_SCORE,
+      payload: { text: normalizedTitle, score },
+    }).then((r) => {
+      pageScoreExplain.textContent = r?.explanation || r?.error || "No explanation available.";
+    }).catch(() => {
+      pageScoreExplain.textContent = "Inspector unavailable.";
+    });
+  });
+
+  pageScoreActions.append(upBtn, downBtn, explainBtn);
+}
+
+async function savePageLabel(label: "positive" | "negative"): Promise<void> {
+  try {
+    await chrome.runtime.sendMessage({
+      type: MSG.SAVE_LABEL,
+      payload: {
+        label: {
+          text: currentPageTitle,
+          label,
+          source: "web",
+          timestamp: Date.now(),
+        },
+      },
+    });
+    await refreshLabelCounts();
+    showToast(`Page labeled as ${label}.`, { type: "success" });
+  } catch {
+    showToast("Failed to save label.", { type: "error" });
+  }
+}
+
+async function loadPageScore(): Promise<void> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    currentPageTabId = tab.id;
+
+    const resp = await chrome.runtime.sendMessage({
+      type: MSG.GET_PAGE_SCORE,
+      payload: { tabId: tab.id },
+    }) as PageScoreResponse;
+
+    renderPageScore(resp);
+  } catch {
+    renderPageScore({ title: "", normalizedTitle: "", result: null, state: "unavailable" });
+  }
+}
+
+// Toggle handler
+togglePageScore.addEventListener("change", () => {
+  chrome.storage.local.set({
+    [STORAGE_KEYS.PAGE_SCORING_ENABLED]: togglePageScore.checked,
+  });
+  // Re-query page score after toggle change (slight delay for background to process)
+  setTimeout(() => void loadPageScore(), 100);
+});
+
 // --- Listen for status updates ---
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === MSG.MODEL_STATUS) {
     updateModelStatus(message.payload);
+  }
+  if (message.type === MSG.PAGE_SCORE_UPDATED) {
+    const payload = message.payload;
+    if (payload?.tabId === currentPageTabId) {
+      renderPageScore(payload as PageScoreResponse);
+    }
   }
 });
 

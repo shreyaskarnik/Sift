@@ -6,6 +6,15 @@ export const MODEL_ID = "onnx-community/embeddinggemma-300m-ONNX";
 /** Default anchor phrase for contrastive similarity scoring */
 export const DEFAULT_QUERY_ANCHOR = "MY_FAVORITE_NEWS";
 
+/** Built-in lens presets used by popup chips and anchor auto-detection */
+export const PRESET_ANCHORS = [
+  "MY_FAVORITE_NEWS",
+  "AI_RESEARCH",
+  "STARTUP_NEWS",
+  "DEEP_TECH",
+  "SCIENCE_DISCOVERIES",
+] as const;
+
 /** Vibe thresholds — score boundaries for each status tier */
 export const VIBE_THRESHOLDS = [
   { score: 0.8, status: "VIBE:HIGH", emoji: "✨" },
@@ -40,6 +49,10 @@ export const MSG = {
   SET_LABELS: "SET_LABELS",
   CLEAR_LABELS: "CLEAR_LABELS",
   IMPORT_X_LABELS: "IMPORT_X_LABELS",
+
+  // Page scoring
+  GET_PAGE_SCORE: "GET_PAGE_SCORE",
+  PAGE_SCORE_UPDATED: "PAGE_SCORE_UPDATED",
 } as const;
 
 /** Storage keys for chrome.storage.local */
@@ -51,6 +64,7 @@ export const STORAGE_KEYS = {
   CUSTOM_MODEL_URL: "custom_model_url",
   SENSITIVITY: "score_sensitivity",
   SITE_ENABLED: "site_enabled",
+  PAGE_SCORING_ENABLED: "page_scoring_enabled",
 } as const;
 
 /** Batch size for content script scoring requests */

@@ -11,8 +11,12 @@ export interface VibeResult {
 export interface TrainingLabel {
   text: string;
   label: "positive" | "negative";
-  source: "hn" | "reddit" | "x" | "x-import";
+  source: "hn" | "reddit" | "x" | "x-import" | "web";
   timestamp: number;
+  /** Active anchor at label time (bookkeeping). */
+  anchor?: string;
+  /** Auto-detected top preset lens/lenses for the labeled text. */
+  detectedAnchors?: string[];
 }
 
 /** Model loading status */
@@ -64,4 +68,17 @@ export interface SetLabelsPayload {
 export interface ExplainScorePayload {
   text: string;
   score: number;
+}
+
+/** Payload for GET_PAGE_SCORE */
+export interface GetPageScorePayload {
+  tabId: number;
+}
+
+/** Response from GET_PAGE_SCORE */
+export interface PageScoreResponse {
+  title: string;
+  normalizedTitle: string;
+  result: VibeResult | null;
+  state: "ready" | "loading" | "unavailable" | "disabled";
 }
