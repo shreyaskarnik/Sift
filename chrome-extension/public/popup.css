@@ -377,14 +377,6 @@ input[type="text"]::placeholder {
   letter-spacing: 0.05em;
 }
 
-/* ── Explain model row ── */
-
-.model-row-explain {
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-}
-
 /* ── Site Toggles ── */
 
 .toggle-row {

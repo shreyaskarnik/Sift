@@ -9,20 +9,15 @@ let siteEnabled: Record<string, boolean> = { hn: true, reddit: true, x: true };
 /** Sensitivity 0-100. Cached, updated via storage listener. */
 let sensitivity = 50;
 
-/** Whether the explain ("?") feature is enabled. */
-let explainEnabled = true;
-
 /** Load settings from storage. Call once before scoring. */
 export async function loadSettings(): Promise<void> {
   try {
     const stored = await chrome.storage.local.get([
       STORAGE_KEYS.SENSITIVITY,
       STORAGE_KEYS.SITE_ENABLED,
-      STORAGE_KEYS.EXPLAIN_ENABLED,
     ]);
     sensitivity = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
     siteEnabled = stored[STORAGE_KEYS.SITE_ENABLED] ?? { hn: true, reddit: true, x: true };
-    explainEnabled = stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false;
   } catch { /* use default */ }
 }
 
@@ -64,16 +59,6 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.SITE_ENABLED]) {
     siteEnabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue ?? { hn: true, reddit: true, x: true };
   }
-  if (changes[STORAGE_KEYS.EXPLAIN_ENABLED]) {
-    explainEnabled = changes[STORAGE_KEYS.EXPLAIN_ENABLED].newValue !== false;
-    if (!explainEnabled) {
-      document.querySelectorAll(".ss-explain-btn").forEach((el) => el.remove());
-      if (activeTip) {
-        activeTip.remove();
-        activeTip = null;
-      }
-    }
-  }
 });
 
 /**
@@ -114,14 +99,14 @@ function getScoreBand(score: number): string {
 }
 
 /**
- * Create the "Why?" explain button. Sends EXPLAIN_SCORE to background
- * and shows the response in a fixed-position tooltip near the button.
+ * Create the score inspector ("?") button. Sends EXPLAIN_SCORE to background
+ * and shows a deterministic rationale in a tooltip near the button.
  */
 function createExplainButton(text: string, score: number): HTMLSpanElement {
   const btn = document.createElement("span");
   btn.className = "ss-vote ss-explain-btn";
   btn.textContent = "?";
-  btn.title = "Why this score?";
+  btn.title = "Inspect score";
 
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -152,7 +137,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
 
     const body = document.createElement("div");
     body.className = "ss-inspector-body";
-    body.textContent = "Thinking\u2026";
+    body.textContent = "Analyzing score\u2026";
 
     header.append(scorePill, bandPill);
     tip.append(header, body);
@@ -176,7 +161,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
     } catch {
       if (document.body.contains(tip)) {
         tip.classList.remove("ss-thinking");
-        body.textContent = "LLM not available.";
+        body.textContent = "Inspector unavailable.";
       }
     }
 
@@ -198,7 +183,7 @@ function createExplainButton(text: string, score: number): HTMLSpanElement {
  * Apply Sift ambient styling to an existing page element.
  * - Colored left bar (red → green proportional to score)
  * - Dims low-scoring items based on sensitivity setting
- * - Vote buttons + explain button appear on hover (if source provided)
+ * - Vote buttons + inspector button appear on hover (if source provided)
  */
 export function applyScore(
   result: VibeResult,
@@ -224,9 +209,7 @@ export function applyScore(
   if (source) {
     const anchor = voteAnchor || el;
     const buttons = createLabelButtons(result.text, source);
-    if (explainEnabled) {
-      buttons.appendChild(createExplainButton(result.text, score));
-    }
+    buttons.appendChild(createExplainButton(result.text, score));
     anchor.appendChild(buttons);
   }
 }

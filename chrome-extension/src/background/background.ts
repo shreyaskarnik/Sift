@@ -1,26 +1,25 @@
 /**
  * Service worker — handles model inference directly using Transformers.js v4.
  *
- * Loads two models on init:
+ * Loads one model on init:
  * 1. EmbeddingGemma-300M (q4) — cosine similarity scoring
- * 2. Gemma 3 270M IT (q4) — "Why this score?" explanations
+ *
+ * Inspector explanations are deterministic and generated from score band +
+ * lightweight title/lens signals (no text-generation model in runtime path).
  */
 import {
   AutoTokenizer,
   AutoModel,
-  pipeline,
   env,
   type PreTrainedTokenizer,
   type PreTrainedModel,
   type ProgressInfo,
-  type TextGenerationPipeline,
 } from "@huggingface/transformers";
 import {
   MSG,
   STORAGE_KEYS,
   DEFAULT_QUERY_ANCHOR,
   MODEL_ID,
-  LLM_MODEL_ID,
   VIBE_THRESHOLDS,
 } from "../shared/constants";
 import type {
@@ -29,7 +28,6 @@ import type {
   TrainingLabel,
   SaveLabelPayload,
   UpdateAnchorPayload,
-  SetExplainEnabledPayload,
   ImportXLabelsPayload,
   SetLabelsPayload,
   ScoreTextsPayload,
@@ -76,18 +74,10 @@ let anchorReady = false;
 let loadingPromise: Promise<void> | null = null;
 
 // ---------------------------------------------------------------------------
-// State — LLM (Gemma 3)
-// ---------------------------------------------------------------------------
-
-let llmPipeline: TextGenerationPipeline | null = null;
-let llmReady = false;
-let llmLoadingPromise: Promise<void> | null = null;
-
-// ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------
 
-let cachedStatus: ModelStatus = { state: "idle", llmState: "idle" };
+let cachedStatus: ModelStatus = { state: "idle" };
 
 function broadcastStatus(status: Partial<ModelStatus>): void {
   cachedStatus = { ...cachedStatus, ...status };
@@ -185,96 +175,154 @@ async function loadEmbeddingModel(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// LLM loading (Gemma 3 270M)
-// ---------------------------------------------------------------------------
-
-async function loadLLM(): Promise<void> {
-  if (llmReady || llmLoadingPromise) return;
-
-  llmLoadingPromise = (async () => {
-    try {
-      // Reset remoteHost to HF for the LLM (custom URL only applies to embedding model)
-      env.remoteHost = "https://huggingface.co";
-
-      const hasWebGPU = !!(navigator as any).gpu;
-      const device = hasWebGPU ? "webgpu" : "wasm";
-
-      console.log(`[bg] Loading LLM ${LLM_MODEL_ID} on ${device}...`);
-      broadcastStatus({ llmState: "loading", llmMessage: "Loading Gemma 3..." });
-
-      llmPipeline = (await pipeline("text-generation", LLM_MODEL_ID, {
-        dtype: "q4",
-        device,
-      })) as TextGenerationPipeline;
-
-      llmReady = true;
-      console.log(`[bg] LLM ready (${device})`);
-      broadcastStatus({ llmState: "ready", llmMessage: "Gemma 3 ready" });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("[bg] LLM load error:", message);
-      broadcastStatus({ llmState: "error", llmMessage: message });
-      llmLoadingPromise = null;
-    }
-  })();
-
-  return llmLoadingPromise;
-}
-
-// ---------------------------------------------------------------------------
-// Load both models
+// Model loading + deterministic inspector reasoning
 // ---------------------------------------------------------------------------
 
 async function loadModels(): Promise<void> {
   await loadEmbeddingModel();
-  // Load LLM only if explain is enabled
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.EXPLAIN_ENABLED);
-  if (stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false) {
-    loadLLM();
-  }
 }
 
-// ---------------------------------------------------------------------------
-// LLM inference — "Why this score?"
-// ---------------------------------------------------------------------------
+interface LensProfile {
+  label: string;
+  include: string[];
+  exclude: string[];
+}
 
-async function explainScore(text: string, score: number): Promise<string> {
-  if (!llmPipeline) throw new Error("LLM not loaded");
+const LENS_PROFILES: Record<string, LensProfile> = {
+  MY_FAVORITE_NEWS: {
+    label: "News / Social Feed",
+    include: ["launch", "release", "open source", "security", "research", "startup", "science"],
+    exclude: ["celebrity", "gossip", "betting", "odds"],
+  },
+  AI_RESEARCH: {
+    label: "AI Research",
+    include: [
+      "model", "llm", "transformer", "benchmark", "paper", "arxiv", "inference",
+      "training", "agent", "embedding", "openai", "anthropic", "gemma",
+    ],
+    exclude: ["earnings", "celebrity", "sports", "gossip"],
+  },
+  STARTUP_NEWS: {
+    label: "Startups",
+    include: ["startup", "funding", "seed", "series a", "series b", "founder", "acquisition", "ipo"],
+    exclude: ["paper", "arxiv", "celebrity"],
+  },
+  DEEP_TECH: {
+    label: "Deep Tech",
+    include: ["infrastructure", "compiler", "kernel", "database", "distributed", "chip", "hardware", "gpu"],
+    exclude: ["gossip", "celebrity", "opinion"],
+  },
+  SCIENCE_DISCOVERIES: {
+    label: "Science",
+    include: ["study", "discovery", "researchers", "experiment", "physics", "biology", "chemistry", "astronomy"],
+    exclude: ["funding round", "ipo", "acquisition"],
+  },
+};
 
-  const anchor = await loadAnchor();
-  const level =
-    score >= 0.8 ? "strong" : score >= 0.5 ? "moderate" : score >= 0.2 ? "weak" : "very weak";
+const BROAD_NEWS_TERMS = [
+  "joins", "announces", "launches", "new", "today", "update", "report", "latest", "improves",
+];
 
-  const messages = [
-    {
-      role: "user",
-      content:
-        `Interest: "${anchor}"\n` +
-        `Title: "${text}"\n` +
-        `Score: ${score.toFixed(2)} (${level})\n\n` +
-        `Why is this title a ${level} match for the interest? One sentence, no bullet points.`,
-    },
-  ];
+function getScoreLevel(score: number): "strong" | "moderate" | "weak" | "very weak" {
+  if (score >= 0.8) return "strong";
+  if (score >= 0.5) return "moderate";
+  if (score >= 0.2) return "weak";
+  return "very weak";
+}
 
-  const output = await (llmPipeline as any)(messages, {
-    max_new_tokens: 60,
-    do_sample: false,
-  });
+function humanizeAnchorLabel(anchor: string): string {
+  const normalized = anchor.replace(/[_-]+/g, " ").trim().toLowerCase();
+  if (!normalized) return "Selected Lens";
+  return normalized.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
 
-  const generated = output[0]?.generated_text;
-  let raw = "";
-  if (Array.isArray(generated)) {
-    const last = generated[generated.length - 1];
-    raw = last?.content || "";
-  } else {
-    raw = String(generated || "");
+function resolveLensProfile(anchor: string): LensProfile {
+  const key = anchor.trim().toUpperCase();
+  if (LENS_PROFILES[key]) return LENS_PROFILES[key];
+  const fallbackLabel = humanizeAnchorLabel(anchor);
+  return { label: fallbackLabel, include: [], exclude: [] };
+}
+
+function matchTerms(titleLower: string, terms: string[]): string[] {
+  const hits: string[] = [];
+  for (const term of terms) {
+    const normalized = term.toLowerCase();
+    if (titleLower.includes(normalized) && !hits.includes(term)) {
+      hits.push(term);
+    }
+  }
+  return hits;
+}
+
+function formatList(values: string[]): string {
+  const clean = values.slice(0, 2);
+  if (clean.length === 0) return "";
+  if (clean.length === 1) return clean[0];
+  return `${clean[0]} and ${clean[1]}`;
+}
+
+function hasBroadSignal(titleLower: string, titleWordCount: number): boolean {
+  if (titleWordCount <= 5) return true;
+  const broadHits = matchTerms(titleLower, BROAD_NEWS_TERMS);
+  return broadHits.length >= 2;
+}
+
+function buildDeterministicExplanation(title: string, score: number, anchor: string): string {
+  const profile = resolveLensProfile(anchor);
+  const normalizedScore = Math.max(0, Math.min(1, score));
+  const level = getScoreLevel(normalizedScore);
+  const titleLower = title.toLowerCase();
+  const titleWordCount = titleLower.split(/\s+/).filter(Boolean).length;
+  const includeHits = matchTerms(titleLower, profile.include);
+  const excludeHits = matchTerms(titleLower, profile.exclude);
+  const broad = hasBroadSignal(titleLower, titleWordCount);
+
+  if (level === "strong") {
+    if (includeHits.length > 0) {
+      return `Strong fit for ${profile.label}. It directly mentions ${formatList(includeHits)}.`;
+    }
+    return `Strong fit for ${profile.label}. The topic is closely aligned.`;
   }
 
-  // Clean up: strip markdown artifacts, bullets, excessive whitespace
-  raw = raw.replace(/\*\*/g, "").replace(/^[\s*•\-]+/gm, "").trim();
-  // Take only the first sentence if the model over-generates
-  const firstSentence = raw.match(/^[^.!?]+[.!?]/);
-  return firstSentence ? firstSentence[0].trim() : raw.slice(0, 200);
+  if (level === "moderate") {
+    if (includeHits.length > 0 && broad) {
+      return `Partial fit for ${profile.label}. It mentions ${formatList(includeHits)}, but the title is broad.`;
+    }
+    if (includeHits.length > 0) {
+      return `Partial fit for ${profile.label}. There is overlap with ${formatList(includeHits)}.`;
+    }
+    if (excludeHits.length > 0) {
+      return `Partial fit. It has some overlap, but leans toward ${formatList(excludeHits)}.`;
+    }
+    return `Partial fit for ${profile.label}. Related, but not very specific.`;
+  }
+
+  if (level === "weak") {
+    if (excludeHits.length > 0) {
+      return `Weak fit for ${profile.label}. This looks more about ${formatList(excludeHits)}.`;
+    }
+    if (includeHits.length > 0) {
+      return `Weak fit for ${profile.label}. Only light overlap via ${formatList(includeHits)}.`;
+    }
+    return `Weak fit for ${profile.label}. Few clear lens signals.`;
+  }
+
+  if (excludeHits.length > 0) {
+    return `Very weak fit for ${profile.label}. Mostly about ${formatList(excludeHits)}.`;
+  }
+  if (broad) {
+    return `Very weak fit for ${profile.label}. The title is broad and generic.`;
+  }
+  return `Very weak fit for ${profile.label}. It appears off-topic.`;
+}
+
+async function explainScore(text: string, score: number): Promise<string> {
+  const title = text.replace(/\s+/g, " ").trim();
+  if (!title) {
+    return "No title text available to inspect.";
+  }
+  const anchor = await loadAnchor();
+  return buildDeterministicExplanation(title, score, anchor);
 }
 
 // ---------------------------------------------------------------------------
@@ -425,11 +473,7 @@ chrome.runtime.onMessage.addListener(
         modelReady = false;
         anchorReady = false;
         loadingPromise = null;
-        // Also reset LLM
-        llmPipeline = null;
-        llmReady = false;
-        llmLoadingPromise = null;
-        cachedStatus = { state: "idle", llmState: "idle" };
+        cachedStatus = { state: "idle" };
         if (prev) {
           prev.catch(() => {}).then(() => loadModels());
         } else {
@@ -457,18 +501,19 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.EXPLAIN_SCORE: {
         const p = payload as ExplainScorePayload;
-        if (!llmReady) {
-          sendResponse({ error: "LLM not ready" });
+        if (typeof p?.text !== "string") {
+          sendResponse({ error: "Invalid explain payload" });
           return;
         }
-        explainScore(p.text, p.score)
+        const safeScore = Number.isFinite(p.score) ? p.score : 0;
+        explainScore(p.text, safeScore)
           .then((explanation) => sendResponse({ explanation }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
 
       case MSG.GET_STATUS: {
-        sendResponse({ ...cachedStatus, modelReady, hasAnchor: anchorReady, llmReady });
+        sendResponse({ ...cachedStatus, modelReady, hasAnchor: anchorReady });
         return;
       }
 
@@ -484,23 +529,6 @@ chrome.runtime.onMessage.addListener(
         }
         sendResponse({ ok: true });
         return;
-      }
-
-      case MSG.SET_EXPLAIN_ENABLED: {
-        const p = payload as SetExplainEnabledPayload;
-        const enabled = p?.enabled !== false;
-        if (!enabled) {
-          llmPipeline = null;
-          llmReady = false;
-          llmLoadingPromise = null;
-          broadcastStatus({ llmState: "idle", llmMessage: "Explain disabled" });
-          sendResponse({ ok: true });
-          return;
-        }
-        loadLLM()
-          .then(() => sendResponse({ ok: true }))
-          .catch((err) => sendResponse({ error: String(err) }));
-        return true;
       }
 
       case MSG.SAVE_LABEL: {

@@ -22,8 +22,6 @@ export interface ModelStatus {
   message?: string;
   backend?: "webgpu" | "wasm";
   modelId?: string;
-  llmState?: "idle" | "loading" | "ready" | "error";
-  llmMessage?: string;
 }
 
 /** Message envelope for chrome.runtime messaging */
@@ -50,11 +48,6 @@ export interface SaveLabelPayload {
 /** Payload for UPDATE_ANCHOR */
 export interface UpdateAnchorPayload {
   anchor: string;
-}
-
-/** Payload for SET_EXPLAIN_ENABLED */
-export interface SetExplainEnabledPayload {
-  enabled: boolean;
 }
 
 /** Payload for IMPORT_X_LABELS */

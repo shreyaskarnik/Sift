@@ -1,11 +1,17 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="chrome-extension/public/icons/logo-dark.svg">
+    <img src="chrome-extension/public/icons/logo-light.svg" alt="Sift logo" width="220">
+  </picture>
+</p>
+
 # Sift
 
 Sift through the noise. Score your feed with EmbeddingGemma, right in the browser.
 
-Sift is a Chrome extension that runs two models directly in the browser via Transformers.js + WebGPU:
+Sift is a Chrome extension that runs EmbeddingGemma directly in the browser via Transformers.js + WebGPU:
 
 - [EmbeddingGemma-300M](https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX) (q4) — scores content against your interests using cosine similarity
-- [Gemma 3 270M IT](https://huggingface.co/onnx-community/gemma-3-270m-it-ONNX) (q4) — explains why items scored high or low
 
 It works on Hacker News, Reddit, and X — dimming low-relevance items so the good stuff stands out.
 
@@ -26,7 +32,7 @@ Chrome MV3 extension in `chrome-extension/`. Runs entirely client-side — no se
 ### Features
 
 - EmbeddingGemma-300M (q4) inference via WebGPU with WASM fallback
-- Gemma 3 270M IT (q4) "Why this score?" explanations
+- Deterministic score inspector (`?`) with score band + concise rationale
 - Scores HN, Reddit, and X feeds with ambient opacity dimming
 - Per-site toggles and sensitivity slider
 - Scoring lens presets (News, AI Research, Startups, Deep Tech, Science)
@@ -107,7 +113,7 @@ Popup ──────────chrome.runtime.sendMessage──────
     (IIFE)         (GET_STATUS, UPDATE_ANCHOR)
 ```
 
-- **Background** — Loads EmbeddingGemma + Gemma 3 via Transformers.js, manages scoring + explanations, routes messages, stores labels
+- **Background** — Loads EmbeddingGemma via Transformers.js, manages scoring + deterministic inspector rationale, routes messages, stores labels
 - **Content scripts** — Site-specific DOM selectors, MutationObserver for infinite scroll, debounced scoring
 - **Popup** — Settings, lens picker, sensitivity slider, data export
 

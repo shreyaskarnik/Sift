@@ -9,7 +9,6 @@ const statusLabel = document.getElementById("status-label")!;
 const modelStatus = document.getElementById("model-status")!;
 const progressBarContainer = document.getElementById("progress-bar-container")!;
 const progressBar = document.getElementById("progress-bar")!;
-const llmStatus = document.getElementById("llm-status")!;
 const lensActive = document.getElementById("lens-active")!;
 const lensText = document.getElementById("lens-text")!;
 const lensEditBtn = document.getElementById("lens-edit-btn")!;
@@ -28,7 +27,6 @@ const toggleReddit = document.getElementById("toggle-reddit") as HTMLInputElemen
 const toggleX = document.getElementById("toggle-x") as HTMLInputElement;
 const sensitivitySlider = document.getElementById("sensitivity-slider") as HTMLInputElement;
 const sensitivityValue = document.getElementById("sensitivity-value")!;
-const toggleExplain = document.getElementById("toggle-explain") as HTMLInputElement;
 const modelSourceInput = document.getElementById("model-source-input") as HTMLInputElement;
 const saveModelSourceBtn = document.getElementById("save-model-source") as HTMLButtonElement;
 const modelIdDisplay = document.getElementById("model-id-display")!;
@@ -156,7 +154,6 @@ async function init() {
     STORAGE_KEYS.CUSTOM_MODEL_URL,
     STORAGE_KEYS.SENSITIVITY,
     STORAGE_KEYS.SITE_ENABLED,
-    STORAGE_KEYS.EXPLAIN_ENABLED,
   ]);
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
   anchorInput.value = anchor;
@@ -175,8 +172,6 @@ async function init() {
   toggleHN.checked = sites.hn !== false;
   toggleReddit.checked = sites.reddit !== false;
   toggleX.checked = sites.x !== false;
-
-  toggleExplain.checked = stored[STORAGE_KEYS.EXPLAIN_ENABLED] !== false;
 
   // Get model status
   try {
@@ -216,19 +211,6 @@ function updateModelStatus(status: ModelStatus) {
   } else {
     statusLabel.textContent = "—";
     modelStatus.textContent = "Initializing...";
-  }
-
-  // LLM status
-  if (!toggleExplain.checked) {
-    llmStatus.textContent = "Off";
-  } else if (status.llmState === "loading") {
-    llmStatus.textContent = status.llmMessage || "Loading Gemma 3...";
-  } else if (status.llmState === "ready") {
-    llmStatus.textContent = "Ready";
-  } else if (status.llmState === "error") {
-    llmStatus.textContent = `Error: ${status.llmMessage}`;
-  } else {
-    llmStatus.textContent = "Waiting...";
   }
 }
 
@@ -331,29 +313,6 @@ function saveSiteToggles() {
 toggleHN.addEventListener("change", saveSiteToggles);
 toggleReddit.addEventListener("change", saveSiteToggles);
 toggleX.addEventListener("change", saveSiteToggles);
-
-toggleExplain.addEventListener("change", async () => {
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.EXPLAIN_ENABLED]: toggleExplain.checked,
-  });
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: MSG.SET_EXPLAIN_ENABLED,
-      payload: { enabled: toggleExplain.checked },
-    });
-    if (response?.error) {
-      throw new Error(response.error);
-    }
-    if (toggleExplain.checked) {
-      llmStatus.textContent = "Starting...";
-    } else {
-      llmStatus.textContent = "Off";
-    }
-  } catch (err) {
-    showToast(`Explain toggle failed: ${String(err)}`, { type: "error" });
-  }
-});
 
 sensitivitySlider.addEventListener("input", () => {
   const val = Number(sensitivitySlider.value);
