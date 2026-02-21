@@ -14,7 +14,7 @@
 
 ## Resolved Design Decisions
 
-1. **Focus Lens**: Dropdown stays functional but no longer affects scoring. Scoring always uses `rankPresets()` (multi-preset). Dropdown sets `currentAnchor` as fallback for label stamping/CSV export only. `onAnchorChange()` no longer triggers feed re-score. Rename label to "Focus Lens".
+1. **Focus Lens**: Dropdown stays functional but no longer affects scoring. Scoring always uses `rankPresets()` (multi-preset). Dropdown sets `currentAnchor` as fallback for label stamping/CSV export only. **Fully remove** `onAnchorChange()` hook and all anchor-change re-scoring listeners from widget.ts and per-site content scripts — don't leave dead code that could cause accidental regressions. Rename label to "Focus Lens".
 2. **EXPLAIN_SCORE**: Caller passes `anchorId` in the payload (content scripts/popup already have `ranking.top.anchor`). Background uses it if present, falls back to `currentAnchor`.
 3. **Pill visibility**: Always show top-1. Show top-2 only if `score >= ANCHOR_MIN_SCORE (0.15)` AND `gap < ANCHOR_TIE_GAP (0.05)`. Uses existing constants.
 4. **Label migration**: `LABEL_SCHEMA_VERSION = 2` in constants. Background wipes labels on startup if stored schema < 2. `TrainingLabel.anchor` becomes required. Remove `detectedAnchors` backward-compat path in CSV export.
@@ -414,7 +414,25 @@ case MSG.SAVE_LABEL: {
 }
 ```
 
-**Step 9: Commit**
+**Step 9: Remove cache invalidation from setAnchor()**
+
+In `setAnchor()` (lines 454-469), remove the stale-marking block that rescores the active tab when the anchor changes. Scoring is now anchor-independent, so changing the Focus Lens dropdown should not invalidate any cached scores.
+
+Delete these lines from `setAnchor()`:
+
+```typescript
+  // DELETE THIS BLOCK:
+  if (pageScoringEnabled) {
+    for (const entry of pageScoreCache.values()) {
+      entry.stale = true;
+    }
+    if (activeTabId > 0) void scorePageTitle(activeTabId);
+  }
+```
+
+Keep `setAnchor()` itself alive — it still stores the anchor and sets `anchorReady = true`.
+
+**Step 10: Commit**
 
 ```bash
 git add chrome-extension/src/background/background.ts
@@ -754,20 +772,12 @@ export function applyScore(
 
 In the `chrome.storage.onChanged` listener (lines 63-77), replace the anchor-change block:
 
-```typescript
-// OLD:
-if (changes[STORAGE_KEYS.ANCHOR]) {
-  clearAppliedScores();
-  resetSiftMarkers();
-  onAnchorChanged?.();
-}
+Fully delete:
+- The `onAnchorChanged` variable (line 55)
+- The `onAnchorChange` export function (lines 58-60)
+- The entire `if (changes[STORAGE_KEYS.ANCHOR])` block in the storage listener (lines 71-76)
 
-// NEW: Scoring uses rankPresets() — anchor change doesn't affect scores.
-// Just update pill highlights if inspector is open. No re-score needed.
-// (onAnchorChanged callback removed — kept for potential future Focus mode)
-```
-
-Remove the `onAnchorChanged` variable (line 55), the `onAnchorChange` export (lines 58-60), and the anchor-change block in the storage listener.
+These are dead code now — scoring uses `rankPresets()` which is anchor-independent. No no-ops, no comments — just delete.
 
 **Step 5: Commit**
 
@@ -1015,18 +1025,22 @@ git commit -m "feat: simplify CSV anchor resolution, remove detectedAnchors comp
 
 ---
 
-### Task 7: Remove unused exports + clean up widget.ts
+### Task 7: Verify full removal of anchor-change scoring hooks
 
 **Files:**
-- Modify: `chrome-extension/src/content/common/widget.ts`
+- Verify: `chrome-extension/src/content/common/widget.ts`
+- Verify: `chrome-extension/src/content/hn/hn-content.ts`
+- Verify: `chrome-extension/src/content/reddit/reddit-content.ts`
+- Verify: `chrome-extension/src/content/x/x-content.ts`
 
-**Step 1: Verify onAnchorChange is fully removed**
+**Step 1: Grep for any remaining onAnchorChange references**
 
-Ensure `onAnchorChange` export, `onAnchorChanged` variable, and the `STORAGE_KEYS.ANCHOR` change listener block are all removed from widget.ts.
+Run: `cd chrome-extension && grep -rn "onAnchorChange\|onAnchorChanged" src/`
+Expected: **Zero results.** If any remain, delete them.
 
-Also remove `resetSiftMarkers` and `clearAppliedScores` from the anchor-change listener block — they should only fire on site-enable toggle, not anchor change.
+**Step 2: Verify widget.ts storage listener has no anchor branch**
 
-Update widget.ts storage listener to only handle sensitivity and site-enabled:
+The listener should only handle sensitivity and site-enabled:
 
 ```typescript
 chrome.storage.onChanged.addListener((changes) => {
@@ -1040,11 +1054,11 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 ```
 
-**Step 2: Remove onAnchorChange imports from per-site scripts**
+No `STORAGE_KEYS.ANCHOR` branch. No `clearAppliedScores()` / `resetSiftMarkers()` on anchor change.
 
-Verify all three content scripts no longer import `onAnchorChange` and no longer have `resetSiftMarkers` import (unless used for site-enable toggle — check each file).
+**Step 3: Verify per-site scripts don't import onAnchorChange**
 
-Note: `clearAppliedScores` and `resetSiftMarkers` are still needed in per-site scripts for the site-enable toggle handler. Keep those imports.
+Each content script should import `clearAppliedScores` and `resetSiftMarkers` only for the site-enable toggle handler. No `onAnchorChange` import.
 
 **Step 3: Build and typecheck**
 
