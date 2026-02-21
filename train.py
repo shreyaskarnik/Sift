@@ -217,6 +217,8 @@ def main():
         parser.error("--epochs must be >= 1")
     if args.lr <= 0:
         parser.error("--lr must be > 0")
+    if not (0 <= args.heldout_fraction < 1):
+        parser.error("--heldout-fraction must be >= 0 and < 1")
 
     # --- Serve mode ---
     if args.serve:

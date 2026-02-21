@@ -42,6 +42,9 @@ def split_held_out(
     if they also appear in training, preventing data leakage.
     Returns (train_triplets, held_out_groups).
     """
+    if fraction == 0:
+        return list(triplets), []
+
     rng = random.Random(seed)
 
     by_anchor: dict[str, list[list[str]]] = defaultdict(list)
