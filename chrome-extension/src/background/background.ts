@@ -895,7 +895,6 @@ chrome.runtime.onMessage.addListener(
         const stamped = (Array.isArray(incoming) ? incoming : []).map((label) => ({
           ...label,
           anchor,
-          detectedAnchors: undefined,
         }));
         enqueueLabelWrite((labels) => { labels.push(...stamped); return labels; })
           .then(() => sendResponse({ success: true, count: stamped.length }))
