@@ -74,7 +74,11 @@ export const STORAGE_KEYS = {
   SENSITIVITY: "score_sensitivity",
   SITE_ENABLED: "site_enabled",
   PAGE_SCORING_ENABLED: "page_scoring_enabled",
+  LABEL_SCHEMA: "label_schema_version",
 } as const;
 
 /** Batch size for content script scoring requests */
 export const SCORE_BATCH_SIZE = 16;
+
+/** Bump when TrainingLabel schema changes. Background wipes labels on mismatch. */
+export const LABEL_SCHEMA_VERSION = 2;

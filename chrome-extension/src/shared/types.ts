@@ -13,10 +13,14 @@ export interface TrainingLabel {
   label: "positive" | "negative";
   source: "hn" | "reddit" | "x" | "x-import" | "web";
   timestamp: number;
-  /** Active anchor at label time (bookkeeping). */
-  anchor?: string;
-  /** Auto-detected top preset lens/lenses for the labeled text. */
-  detectedAnchors?: string[];
+  /** Resolved anchor (override > auto > fallback). Required in schema v2+. */
+  anchor: string;
+  /** What the model predicted as best-match anchor. */
+  autoAnchor?: string;
+  /** Confidence: top1.score - top2.score gap. */
+  autoConfidence?: number;
+  /** How anchor was resolved. */
+  anchorSource?: "auto" | "override" | "fallback";
 }
 
 /** Model loading status */
@@ -42,24 +46,34 @@ export interface ScoreTextsPayload {
 /** Payload for SCORE_RESULTS */
 export interface ScoreResultsPayload {
   results: VibeResult[];
-  detectedAnchors?: (DetectedAnchor[] | undefined)[];
+  rankings?: (PresetRanking | undefined)[];
 }
 
-/** Detected anchor with similarity score for grounded display. */
-export interface DetectedAnchor {
-  id: string;
+/** A single preset's similarity score. */
+export interface PresetRank {
+  anchor: string;
   score: number;
 }
 
-/** A scored text with optional detected lens anchors. */
+/** All presets ranked by similarity for a single text. */
+export interface PresetRanking {
+  ranks: PresetRank[];     // all presets, sorted by score desc
+  top: PresetRank;         // ranks[0] — scoring winner
+  confidence: number;      // top1.score - top2.score
+  ambiguous: boolean;      // confidence < 0.05
+}
+
+/** A scored text with optional preset ranking. */
 export interface ScoredItem {
   result: VibeResult;
-  detectedAnchors?: DetectedAnchor[];
+  ranking?: PresetRanking;
 }
 
 /** Payload for SAVE_LABEL */
 export interface SaveLabelPayload {
   label: TrainingLabel;
+  anchorOverride?: string;
+  presetRanking?: PresetRanking;
 }
 
 /** Payload for UPDATE_ANCHOR */
@@ -81,6 +95,7 @@ export interface SetLabelsPayload {
 export interface ExplainScorePayload {
   text: string;
   score: number;
+  anchorId?: string;  // winning anchor from ranking
 }
 
 /** Payload for GET_PAGE_SCORE */
@@ -93,7 +108,7 @@ export interface PageScoreResponse {
   title: string;
   normalizedTitle: string;
   result: VibeResult | null;
-  detectedAnchors?: string[];
+  ranking?: PresetRanking;
   state: "ready" | "loading" | "unavailable" | "disabled";
 }
 
