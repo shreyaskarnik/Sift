@@ -13,7 +13,8 @@ Sift is a Chrome extension that runs EmbeddingGemma directly in the browser via 
 
 - [EmbeddingGemma-300M](https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX) (q4) — scores content against your interests using cosine similarity
 
-It works on Hacker News, Reddit, and X — dimming low-relevance items so the good stuff stands out.
+Current site support (for now): **Hacker News, Reddit, and X**. More site integrations are planned.
+On supported sites, Sift dims low-relevance items so the good stuff stands out.
 
 Users can label items (thumbs up/down) to collect training data, export it as CSV, and fine-tune the model with the included Python pipeline.
 
@@ -28,6 +29,8 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 ## Extension
 
 Chrome MV3 extension in `chrome-extension/`. Runs entirely client-side — no server, no data leaves your browser.
+
+Supported sites today: **Hacker News, Reddit, X** (more coming).
 
 ### Features
 
