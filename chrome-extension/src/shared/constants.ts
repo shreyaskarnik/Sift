@@ -77,6 +77,12 @@ export const STORAGE_KEYS = {
   LABEL_SCHEMA: "label_schema_version",
 } as const;
 
+/** Minimum score gap between top two presets to consider the match unambiguous */
+export const ANCHOR_TIE_GAP = 0.05;
+
+/** Minimum score for a secondary preset to qualify as a visible pill */
+export const ANCHOR_MIN_SCORE = 0.15;
+
 /** Batch size for content script scoring requests */
 export const SCORE_BATCH_SIZE = 16;
 

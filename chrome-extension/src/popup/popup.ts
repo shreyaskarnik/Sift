@@ -1,4 +1,4 @@
-import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_LABELS } from "../shared/constants";
+import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_LABELS, ANCHOR_MIN_SCORE } from "../shared/constants";
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
@@ -312,7 +312,7 @@ async function applyAnchor(anchor: string) {
   if (response?.error) {
     showToast(`Failed to update lens: ${response.error}`, { type: "error" });
   } else {
-    showToast("Scoring lens updated.", { type: "success" });
+    showToast("Focus lens updated.", { type: "success" });
     // Readiness depends on current anchor — refresh after switch
     updateDataReadiness(lastLabelStats);
   }
@@ -581,11 +581,9 @@ function renderPageScore(resp: PageScoreResponse): void {
 
   // Render detected anchor pills from ranking
   if (resp.ranking) {
-    const ANCHOR_TIE_GAP = 0.05;
-    const ANCHOR_MIN_SCORE = 0.15;
     const pills = [resp.ranking.top];
     const second = resp.ranking.ranks[1];
-    if (second && second.score >= ANCHOR_MIN_SCORE && resp.ranking.confidence < ANCHOR_TIE_GAP) {
+    if (second && second.score >= ANCHOR_MIN_SCORE && resp.ranking.ambiguous) {
       pills.push(second);
     }
 

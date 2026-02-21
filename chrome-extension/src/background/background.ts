@@ -23,6 +23,7 @@ import {
   PRESET_ANCHORS,
   VIBE_THRESHOLDS,
   LABEL_SCHEMA_VERSION,
+  ANCHOR_TIE_GAP,
 } from "../shared/constants";
 import type {
   ExtensionMessage,
@@ -407,8 +408,6 @@ function mapScoreToVibe(text: string, score: number) {
   }
   return { text, rawScore: score, status, emoji, colorHSL };
 }
-
-const ANCHOR_TIE_GAP = 0.05;
 
 async function embedPresetAnchors(): Promise<void> {
   if (!modelReady) return;
@@ -804,8 +803,9 @@ chrome.runtime.onMessage.addListener(
           currentAnchor = anchor;
         }
         if (anchor && modelReady) {
-          anchorReady = false;
           chrome.storage.local.set({ [STORAGE_KEYS.ANCHOR]: anchor });
+          // Re-embed anchor in background — don't gate scoring since
+          // rankPresets() uses presetEmbeddings, not anchorEmbedding.
           setAnchor(anchor)
             .then(() => sendResponse({ success: true }))
             .catch((err) => sendResponse({ error: String(err) }));
@@ -826,6 +826,7 @@ chrome.runtime.onMessage.addListener(
           // Anchor resolution: override > auto > fresh detect > fallback
           let resolvedAnchor: string;
           let anchorSource: "override" | "auto" | "fallback";
+          let effectiveRanking = presetRanking;
 
           if (anchorOverride) {
             resolvedAnchor = anchorOverride;
@@ -841,6 +842,7 @@ chrome.runtime.onMessage.addListener(
               if (ranking) {
                 resolvedAnchor = ranking.top.anchor;
                 anchorSource = "auto";
+                effectiveRanking = ranking;
               } else {
                 resolvedAnchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
                 anchorSource = "fallback";
@@ -854,8 +856,8 @@ chrome.runtime.onMessage.addListener(
           const stamped: TrainingLabel = {
             ...label,
             anchor: resolvedAnchor,
-            autoAnchor: presetRanking?.top.anchor,
-            autoConfidence: presetRanking?.confidence,
+            autoAnchor: effectiveRanking?.top.anchor,
+            autoConfidence: effectiveRanking?.confidence,
             anchorSource,
           };
 

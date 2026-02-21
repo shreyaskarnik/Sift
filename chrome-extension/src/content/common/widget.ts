@@ -1,4 +1,4 @@
-import { MSG, STORAGE_KEYS, ANCHOR_LABELS } from "../../shared/constants";
+import { MSG, STORAGE_KEYS, ANCHOR_LABELS, ANCHOR_MIN_SCORE } from "../../shared/constants";
 import type { VibeResult, PresetRanking, PresetRank } from "../../shared/types";
 import { scoreToHue, getScoreBand } from "../../shared/scoring-utils";
 import { injectStyles } from "./styles";
@@ -103,11 +103,9 @@ let activeTip: HTMLElement | null = null;
 
 /** Extract visible pills from a PresetRanking (top + optional second if ambiguous). */
 function rankingToPills(ranking: PresetRanking): PresetRank[] {
-  const ANCHOR_TIE_GAP = 0.05;
-  const ANCHOR_MIN_SCORE = 0.15;
   const pills: PresetRank[] = [ranking.top];
   const second = ranking.ranks[1];
-  if (second && second.score >= ANCHOR_MIN_SCORE && ranking.confidence < ANCHOR_TIE_GAP) {
+  if (second && second.score >= ANCHOR_MIN_SCORE && ranking.ambiguous) {
     pills.push(second);
   }
   return pills;
