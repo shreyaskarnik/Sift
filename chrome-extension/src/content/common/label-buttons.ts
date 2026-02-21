@@ -1,9 +1,11 @@
 import { MSG } from "../../shared/constants";
-import type { TrainingLabel } from "../../shared/types";
+import type { TrainingLabel, PresetRanking } from "../../shared/types";
 
 export function createLabelButtons(
   text: string,
   source: "hn" | "reddit" | "x",
+  ranking?: PresetRanking,
+  anchorOverride?: string,
 ): HTMLSpanElement {
   const container = document.createElement("span");
   container.className = "ss-votes";
@@ -20,6 +22,12 @@ export function createLabelButtons(
 
   let selected: "positive" | "negative" | null = null;
 
+  /** Current override — may be updated by pill click after button creation. */
+  let currentOverride = anchorOverride;
+
+  /** Allow external code (pill click) to update the override. */
+  (container as any)._setAnchorOverride = (id: string) => { currentOverride = id; };
+
   function handleClick(label: "positive" | "negative", btn: HTMLSpanElement) {
     if (selected === label) return;
     selected = label;
@@ -30,9 +38,7 @@ export function createLabelButtons(
     btnDown.classList.toggle("ss-on", !isUp);
     btnDown.classList.toggle("ss-off", isUp);
 
-    // Trigger pop animation on the selected button
     btn.classList.remove("ss-pop");
-    // Force reflow so re-adding the class restarts the animation
     void btn.offsetWidth;
     btn.classList.add("ss-pop");
 
@@ -41,11 +47,16 @@ export function createLabelButtons(
       label,
       source,
       timestamp: Date.now(),
+      anchor: currentOverride || ranking?.top.anchor || "",
     };
 
     chrome.runtime.sendMessage({
       type: MSG.SAVE_LABEL,
-      payload: { label: trainingLabel },
+      payload: {
+        label: trainingLabel,
+        anchorOverride: currentOverride,
+        presetRanking: ranking,
+      },
     });
   }
 

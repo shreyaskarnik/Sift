@@ -1,7 +1,6 @@
 import { MSG, SCORE_BATCH_SIZE } from "../../shared/constants";
-import type { ScoredItem, DetectedAnchor } from "../../shared/types";
+import type { ScoredItem, PresetRanking } from "../../shared/types";
 
-/** Wait for the model AND anchor to be ready, polling with exponential backoff. */
 async function waitForModel(maxWaitMs = 120_000): Promise<void> {
   let delay = 1000;
   const start = Date.now();
@@ -34,9 +33,9 @@ export async function scoreTexts(texts: string[]): Promise<ScoredItem[]> {
       throw new Error(response.error);
     }
     if (response?.results) {
-      const anchors: (DetectedAnchor[] | undefined)[] = response.detectedAnchors ?? [];
+      const rankings: (PresetRanking | undefined)[] = response.rankings ?? [];
       response.results.forEach((result: ScoredItem["result"], j: number) => {
-        items.push({ result, detectedAnchors: anchors[j] });
+        items.push({ result, ranking: rankings[j] });
       });
     }
   }
