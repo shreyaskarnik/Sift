@@ -18,6 +18,7 @@ export async function parseXArchiveFiles(files: FileList): Promise<TrainingLabel
         label: "positive",
         source: "x-import",
         timestamp: now,
+        anchor: "",
       });
     }
   }

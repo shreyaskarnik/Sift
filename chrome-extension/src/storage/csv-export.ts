@@ -41,10 +41,7 @@ export function countExportableTriplets(
 /**
  * Generate multi-anchor Anchor,Positive,Negative triplet CSV from training labels.
  *
- * Anchor resolution priority for each label:
- * 1) detectedAnchors (auto-detected; may duplicate across groups)
- * 2) anchor (active lens at label time)
- * 3) fallbackAnchor (current popup anchor)
+ * Anchor resolution: label.anchor (required in schema v2+), then fallbackAnchor.
  */
 export function exportToCSV(labels: TrainingLabel[], fallbackAnchor: string): string {
   const normalizedFallback = fallbackAnchor.trim();
@@ -85,15 +82,6 @@ export function exportToCSV(labels: TrainingLabel[], fallbackAnchor: string): st
 }
 
 function resolveAnchorsForLabel(label: TrainingLabel, fallbackAnchor: string): string[] {
-  if (Array.isArray(label.detectedAnchors) && label.detectedAnchors.length > 0) {
-    const unique = new Set<string>();
-    for (const anchor of label.detectedAnchors) {
-      const clean = anchor.trim();
-      if (clean) unique.add(clean);
-    }
-    if (unique.size > 0) return [...unique];
-  }
-
   const stampedAnchor = label.anchor?.trim();
   if (stampedAnchor) return [stampedAnchor];
   return [fallbackAnchor];
