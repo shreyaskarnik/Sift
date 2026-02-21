@@ -22,6 +22,7 @@ import {
   MODEL_ID,
   PRESET_ANCHORS,
   VIBE_THRESHOLDS,
+  LABEL_SCHEMA_VERSION,
 } from "../shared/constants";
 import type {
   ExtensionMessage,
@@ -37,6 +38,8 @@ import type {
   GetPageScorePayload,
   PageScoreResponse,
   PageScoreUpdatedPayload,
+  PresetRanking,
+  PresetRank,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
 
@@ -86,6 +89,18 @@ chrome.storage.local.get(STORAGE_KEYS.ANCHOR).then((stored) => {
   const anchor = stored[STORAGE_KEYS.ANCHOR];
   if (typeof anchor === "string" && anchor.trim().length > 0) {
     currentAnchor = anchor.trim();
+  }
+});
+
+// Migrate labels: wipe if schema version is outdated
+chrome.storage.local.get([STORAGE_KEYS.LABEL_SCHEMA]).then((stored) => {
+  const storedVersion = stored[STORAGE_KEYS.LABEL_SCHEMA] ?? 0;
+  if (storedVersion < LABEL_SCHEMA_VERSION) {
+    console.log(`[bg] Label schema ${storedVersion} → ${LABEL_SCHEMA_VERSION}: wiping old labels`);
+    chrome.storage.local.set({
+      [STORAGE_KEYS.LABELS]: [],
+      [STORAGE_KEYS.LABEL_SCHEMA]: LABEL_SCHEMA_VERSION,
+    });
   }
 });
 
@@ -333,12 +348,12 @@ function buildDeterministicExplanation(title: string, score: number, anchor: str
   return `Very weak fit for ${profile.label}. It appears off-topic.`;
 }
 
-async function explainScore(text: string, score: number): Promise<string> {
+async function explainScore(text: string, score: number, anchorId?: string): Promise<string> {
   const title = text.replace(/\s+/g, " ").trim();
   if (!title) {
     return "No title text available to inspect.";
   }
-  const anchor = await loadAnchor();
+  const anchor = anchorId || await loadAnchor();
   return buildDeterministicExplanation(title, score, anchor);
 }
 
@@ -394,7 +409,6 @@ function mapScoreToVibe(text: string, score: number) {
 }
 
 const ANCHOR_TIE_GAP = 0.05;
-const ANCHOR_MIN_SCORE = 0.15;
 
 async function embedPresetAnchors(): Promise<void> {
   if (!modelReady) return;
@@ -405,38 +419,27 @@ async function embedPresetAnchors(): Promise<void> {
   });
 }
 
-/** Core detection with scores from a pre-computed embedding vector. */
-function detectAnchorsDetailedFromEmbedding(
-  textEmb: Float32Array,
-): { id: string; score: number }[] | undefined {
+/**
+ * Rank all preset anchors by similarity to a text embedding.
+ * Single primitive: scoring, pills, labels, explanation all derive from this.
+ */
+function rankPresets(textEmb: Float32Array): PresetRanking | undefined {
   if (presetEmbeddings.size === 0) return undefined;
 
-  const scored = [...presetEmbeddings.entries()]
-    .map(([anchor, emb]) => ({ id: anchor, score: cosineSimilarity(textEmb, emb) }))
+  const ranks: PresetRank[] = [...presetEmbeddings.entries()]
+    .map(([anchor, emb]) => ({ anchor, score: cosineSimilarity(textEmb, emb) }))
     .sort((a, b) => b.score - a.score);
 
-  const top = scored[0];
-  if (!top || top.score < ANCHOR_MIN_SCORE) return undefined;
+  const top = ranks[0];
+  const second = ranks[1];
+  const confidence = second ? top.score - second.score : 1.0;
 
-  const second = scored[1];
-  if (second && second.score >= ANCHOR_MIN_SCORE && top.score - second.score < ANCHOR_TIE_GAP) {
-    return [top, second];
-  }
-  return [top];
-}
-
-/** Name-only wrapper for SAVE_LABEL and page score cache paths. */
-function detectAnchorsFromEmbedding(textEmb: Float32Array): string[] | undefined {
-  return detectAnchorsDetailedFromEmbedding(textEmb)?.map((a) => a.id);
-}
-
-/** Embed text then detect anchors. Used by SAVE_LABEL path. */
-async function detectAnchors(text: string): Promise<string[] | undefined> {
-  const input = text.replace(/\s+/g, " ").trim();
-  if (!input || !modelReady || presetEmbeddings.size === 0) return undefined;
-
-  const [textEmb] = await embed([input]);
-  return detectAnchorsFromEmbedding(textEmb);
+  return {
+    ranks,
+    top,
+    confidence,
+    ambiguous: confidence < ANCHOR_TIE_GAP,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -458,14 +461,6 @@ async function setAnchor(anchor: string): Promise<void> {
   anchorEmbedding = emb;
   anchorReady = true;
   console.log("[bg] Anchor embedded");
-
-  // Mark all page score cache entries stale; rescore active tab immediately
-  if (pageScoringEnabled) {
-    for (const entry of pageScoreCache.values()) {
-      entry.stale = true;
-    }
-    if (activeTabId > 0) void scorePageTitle(activeTabId);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -507,7 +502,7 @@ interface PageScoreCacheEntry {
   title: string;
   normalizedTitle: string;
   result: VibeResult;
-  detectedAnchors?: string[];
+  ranking?: PresetRanking;
   stale: boolean;
 }
 
@@ -628,17 +623,17 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
       return existing;
     }
 
-    // Single embed call — reuse vector for both main score and anchor detection
+    // Single embed call — reuse vector for both main score and preset ranking
     const [textEmb] = await embed([norm]);
-    const score = cosineSimilarity(anchorEmbedding!, textEmb);
+    const ranking = rankPresets(textEmb);
+    const score = ranking ? ranking.top.score : cosineSimilarity(anchorEmbedding!, textEmb);
     const result = mapScoreToVibe(norm, score);
-    const detectedAnchors = detectAnchorsFromEmbedding(textEmb);
 
     const entry: PageScoreCacheEntry = {
       title,
       normalizedTitle: norm,
       result,
-      detectedAnchors,
+      ranking,
       stale: false,
     };
     pageScoreCache.set(tabId, entry);
@@ -646,7 +641,7 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
 
     // Broadcast to popup
     const updated: PageScoreUpdatedPayload = {
-      tabId, title, normalizedTitle: norm, result, detectedAnchors, state: "ready",
+      tabId, title, normalizedTitle: norm, result, ranking, state: "ready",
     };
     chrome.runtime.sendMessage({
       type: MSG.PAGE_SCORE_UPDATED,
@@ -773,15 +768,15 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ error: "Model not ready" });
           return;
         }
-        // Embed once, compute both scores and detected anchors per text
         embed(p.texts)
           .then((embeddings) => {
+            const rankings = embeddings.map((emb) => rankPresets(emb));
             const results = p.texts.map((text, i) => {
-              const score = cosineSimilarity(anchorEmbedding!, embeddings[i]);
+              const ranking = rankings[i];
+              const score = ranking ? ranking.top.score : cosineSimilarity(anchorEmbedding!, embeddings[i]);
               return mapScoreToVibe(text, score);
             });
-            const detectedAnchors = embeddings.map((emb) => detectAnchorsDetailedFromEmbedding(emb));
-            sendResponse({ results, detectedAnchors });
+            sendResponse({ results, rankings });
           })
           .catch((err) => sendResponse({ error: String(err) }));
         return true; // keep channel open
@@ -794,7 +789,7 @@ chrome.runtime.onMessage.addListener(
           return;
         }
         const safeScore = Number.isFinite(p.score) ? p.score : 0;
-        explainScore(p.text, safeScore)
+        explainScore(p.text, safeScore, p.anchorId)
           .then((explanation) => sendResponse({ explanation }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
@@ -823,25 +818,47 @@ chrome.runtime.onMessage.addListener(
       }
 
       case MSG.SAVE_LABEL: {
-        const { label } = payload as SaveLabelPayload;
+        const { label, anchorOverride, presetRanking } = payload as SaveLabelPayload;
         if (!label || typeof label.text !== "string") {
           sendResponse({ error: "Invalid label payload" });
           return;
         }
-        const anchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
 
         (async () => {
-          let detectedAnchors: string[] | undefined;
-          try {
-            detectedAnchors = await detectAnchors(label.text);
-          } catch (err) {
-            console.warn("[bg] Anchor detection failed for label:", err);
+          // Anchor resolution: override > auto > fresh detect > fallback
+          let resolvedAnchor: string;
+          let anchorSource: "override" | "auto" | "fallback";
+
+          if (anchorOverride) {
+            resolvedAnchor = anchorOverride;
+            anchorSource = "override";
+          } else if (presetRanking?.top) {
+            resolvedAnchor = presetRanking.top.anchor;
+            anchorSource = "auto";
+          } else {
+            // Fallback: embed + rank (for cases like X archive import)
+            try {
+              const [textEmb] = await embed([label.text.replace(/\s+/g, " ").trim()]);
+              const ranking = rankPresets(textEmb);
+              if (ranking) {
+                resolvedAnchor = ranking.top.anchor;
+                anchorSource = "auto";
+              } else {
+                resolvedAnchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+                anchorSource = "fallback";
+              }
+            } catch {
+              resolvedAnchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+              anchorSource = "fallback";
+            }
           }
 
           const stamped: TrainingLabel = {
             ...label,
-            anchor,
-            ...(detectedAnchors?.length ? { detectedAnchors } : {}),
+            anchor: resolvedAnchor,
+            autoAnchor: presetRanking?.top.anchor,
+            autoConfidence: presetRanking?.confidence,
+            anchorSource,
           };
 
           await enqueueLabelWrite((labels) => { labels.push(stamped); return labels; });
@@ -913,7 +930,7 @@ chrome.runtime.onMessage.addListener(
               title: cached.title,
               normalizedTitle: cached.normalizedTitle,
               result: cached.result,
-              detectedAnchors: cached.detectedAnchors,
+              ranking: cached.ranking,
               state: "ready",
             } as PageScoreResponse);
             return;
@@ -938,7 +955,7 @@ chrome.runtime.onMessage.addListener(
                   title: entry.title,
                   normalizedTitle: entry.normalizedTitle,
                   result: entry.result,
-                  detectedAnchors: entry.detectedAnchors,
+                  ranking: entry.ranking,
                   state: "ready",
                 } as PageScoreResponse);
               } else {
