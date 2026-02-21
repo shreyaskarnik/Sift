@@ -503,7 +503,6 @@ interface PageScoreCacheEntry {
   normalizedTitle: string;
   result: VibeResult;
   ranking?: PresetRanking;
-  stale: boolean;
 }
 
 const pageScoreCache = new Map<number, PageScoreCacheEntry>();
@@ -617,9 +616,9 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
     const title = tab.title;
     const norm = normalizeTitle(title);
 
-    // Dedup: skip if same normalized title is already cached and not stale
+    // Dedup: skip if same normalized title is already cached
     const existing = pageScoreCache.get(tabId);
-    if (existing && existing.normalizedTitle === norm && !existing.stale) {
+    if (existing && existing.normalizedTitle === norm) {
       return existing;
     }
 
@@ -634,7 +633,6 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
       normalizedTitle: norm,
       result,
       ranking,
-      stale: false,
     };
     pageScoreCache.set(tabId, entry);
     updateBadge(tabId, result);
@@ -683,7 +681,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   // and evicts cache if non-scorable. Cached + fresh entries short-circuit
   // inside scorePageTitle without hitting the model.
   const cached = pageScoreCache.get(tabId);
-  if (cached && !cached.stale) {
+  if (cached) {
     updateBadge(tabId, cached.result);
   } else {
     clearBadge();
@@ -924,7 +922,7 @@ chrome.runtime.onMessage.addListener(
 
           // Return from cache if fresh and title matches current tab
           const cached = pageScoreCache.get(p.tabId);
-          if (cached && !cached.stale && cached.title === tab.title) {
+          if (cached && cached.title === tab.title) {
             sendResponse({
               title: cached.title,
               normalizedTitle: cached.normalizedTitle,
