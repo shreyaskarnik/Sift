@@ -6,7 +6,6 @@ import {
   loadSettings,
   isSiteEnabled,
   onModelReady,
-  onAnchorChange,
   resetSiftMarkers,
 } from "../common/widget";
 
@@ -34,12 +33,12 @@ async function processHN() {
     const texts = unprocessed.map((u) => u.text);
     const items = await scoreTexts(texts);
 
-    items.forEach(({ result, detectedAnchors }, i) => {
+    items.forEach(({ result, ranking }, i) => {
       const { el } = unprocessed[i];
       el.dataset.sift = "done";
       el.classList.remove("ss-pending");
       const titleLine = el.parentElement as HTMLElement;
-      applyScore(result, titleLine, titleLine, "hn", detectedAnchors);
+      applyScore(result, titleLine, titleLine, "hn", ranking);
     });
   } catch {
     // Reset so items can be retried when model becomes ready
@@ -55,8 +54,6 @@ async function processHN() {
   void processHN();
   // Re-process when model becomes ready (handles cold start timing)
   onModelReady(() => void processHN());
-  // Re-score all items when anchor/lens changes
-  onAnchorChange(() => void processHN());
 
   chrome.storage.onChanged.addListener((changes) => {
     if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;
