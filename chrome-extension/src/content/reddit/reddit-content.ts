@@ -100,7 +100,7 @@ const observer = new MutationObserver(() => {
 (async () => {
   await loadSettings();
   void processReddit();
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.querySelector("main") || document.body, { childList: true, subtree: true });
   onModelReady(() => void processReddit());
   onCategoriesChanged(() => void processReddit());
 

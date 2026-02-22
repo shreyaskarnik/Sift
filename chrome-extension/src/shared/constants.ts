@@ -115,7 +115,11 @@ export const STORAGE_KEYS = {
   ACTIVE_CATEGORY_IDS: "active_category_ids",
   CATEGORY_MAP: "category_map",
   CATEGORIES_VERSION: "categories_version",
+  TOP_K_PILLS: "top_k_pills",
 } as const;
+
+/** Default number of category pills shown per scored item */
+export const DEFAULT_TOP_K_PILLS = 2;
 
 /** Minimum score gap between top two presets to consider the match unambiguous */
 export const ANCHOR_TIE_GAP = 0.05;

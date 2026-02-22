@@ -599,6 +599,26 @@ button.danger:hover {
   padding-top: 10px;
 }
 
+.topk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.topk-row select {
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  cursor: pointer;
+}
+
 .category-grid {
   display: flex;
   flex-direction: column;

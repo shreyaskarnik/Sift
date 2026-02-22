@@ -1,4 +1,4 @@
-import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_MIN_SCORE, BUILTIN_CATEGORIES, DEFAULT_ACTIVE_IDS } from "../shared/constants";
+import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_MIN_SCORE, BUILTIN_CATEGORIES, DEFAULT_ACTIVE_IDS, DEFAULT_TOP_K_PILLS } from "../shared/constants";
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
@@ -96,6 +96,8 @@ let activeIds: string[] = [...DEFAULT_ACTIVE_IDS];
 
 let lastLabels: TrainingLabel[] = [];
 let lastLabelStats: LabelStats = EMPTY_STATS;
+let topKPills: number = DEFAULT_TOP_K_PILLS;
+let lastPageScoreResp: PageScoreResponse | null = null;
 
 type ToastType = "info" | "success" | "error";
 
@@ -346,7 +348,18 @@ async function init() {
     STORAGE_KEYS.SITE_ENABLED,
     STORAGE_KEYS.PAGE_SCORING_ENABLED,
     STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
+    STORAGE_KEYS.TOP_K_PILLS,
   ]);
+
+  // Top-K pills
+  topKPills = (stored[STORAGE_KEYS.TOP_K_PILLS] as number) ?? DEFAULT_TOP_K_PILLS;
+  const topkSelect = document.getElementById("topk-select") as HTMLSelectElement;
+  topkSelect.value = String(topKPills);
+  topkSelect.addEventListener("change", () => {
+    topKPills = Number(topkSelect.value);
+    chrome.storage.local.set({ [STORAGE_KEYS.TOP_K_PILLS]: topKPills });
+    if (lastPageScoreResp) renderPageScore(lastPageScoreResp);
+  });
 
   // Active categories
   const savedIds = stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined;
@@ -407,6 +420,8 @@ function updateModelStatus(status: ModelStatus) {
     statusLabel.textContent = "Error";
     modelStatus.textContent = `Error: ${status.message}`;
     progressBarContainer.style.display = "none";
+    // Auto-open Settings so the error message is visible
+    (document.querySelector(".fold-settings") as HTMLDetailsElement).open = true;
   } else {
     statusLabel.textContent = "—";
     modelStatus.textContent = "Initializing...";
@@ -426,6 +441,7 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
 
     if (stats.total === 0) {
       labelCounts.textContent = "No labels collected yet.";
+      clearDataBtn.textContent = "Clear All Data";
       updateDataReadiness(stats);
       return labels;
     }
@@ -436,6 +452,7 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
       `Total: ${stats.total} (${stats.pos} positive, ${stats.neg} negative)\n` +
       sources.join(" | ");
 
+    clearDataBtn.textContent = stats.total > 0 ? `Clear ${stats.total} Labels` : "Clear All Data";
     updateDataReadiness(stats);
     return labels;
   } catch {
@@ -504,7 +521,7 @@ exportCsvBtn.addEventListener("click", async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sift_training_${Date.now()}.csv`;
+    a.download = `sift_training_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -520,10 +537,13 @@ importXInput.addEventListener("change", async () => {
   if (!files || files.length === 0) return;
 
   try {
-    const labels = await parseXArchiveFiles(files);
+    const { labels, skipped } = await parseXArchiveFiles(files);
 
     if (labels.length === 0) {
-      showToast("No tweets found in the uploaded files.", { type: "error" });
+      const msg = skipped > 0
+        ? `No usable tweets found (${skipped} too short to use).`
+        : "No tweets found in the uploaded files.";
+      showToast(msg, { type: "error" });
       return;
     }
 
@@ -536,7 +556,10 @@ importXInput.addEventListener("change", async () => {
       throw new Error(response.error);
     }
 
-    showToast(`Imported ${labels.length} tweets as positive labels.`, { type: "success" });
+    const msg = skipped > 0
+      ? `Imported ${labels.length} tweets (${skipped} too short to use).`
+      : `Imported ${labels.length} tweets as positive labels.`;
+    showToast(msg, { type: "success" });
     await refreshLabelCounts();
   } catch (err) {
     showToast(`Import failed: ${String(err)}`, { type: "error" });
@@ -590,6 +613,7 @@ let currentPageRanking: PresetRanking | undefined;
 let currentPageAnchorOverride: string | undefined;
 
 function renderPageScore(resp: PageScoreResponse): void {
+  lastPageScoreResp = resp;
   const prevState = lastPageState;
   lastPageState = resp.state;
 
@@ -680,7 +704,7 @@ function renderPageScore(resp: PageScoreResponse): void {
     pageScoreExplain.style.display = "block";
     chrome.runtime.sendMessage({
       type: MSG.EXPLAIN_SCORE,
-      payload: { text: normalizedTitle, score, anchorId: currentPageRanking?.top.anchor },
+      payload: { text: normalizedTitle, score, anchorId: currentPageRanking?.top.anchor, ranking: currentPageRanking },
     }).then((r) => {
       pageScoreExplain.textContent = r?.explanation || r?.error || "No explanation available.";
     }).catch(() => {
@@ -694,13 +718,11 @@ function renderPageScore(resp: PageScoreResponse): void {
   currentPageAnchorOverride = undefined;
   currentPageRanking = resp.ranking;
 
-  // Render detected anchor pills from ranking
+  // Render detected anchor pills from ranking (top-K)
   if (resp.ranking) {
-    const pills = [resp.ranking.top];
-    const second = resp.ranking.ranks[1];
-    if (second && second.score >= ANCHOR_MIN_SCORE && resp.ranking.ambiguous) {
-      pills.push(second);
-    }
+    const pills = resp.ranking.ranks
+      .slice(0, topKPills)
+      .filter((r) => r === resp.ranking!.top || r.score >= ANCHOR_MIN_SCORE);
 
     if (pills.length > 0) {
       for (const pr of pills) {

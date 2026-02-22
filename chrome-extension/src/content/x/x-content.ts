@@ -39,7 +39,7 @@ async function processX() {
       const { el } = unprocessed[i];
       el.dataset.sift = "done";
       el.classList.remove("ss-pending");
-      applyScore(result, el, el, "x", ranking);
+      applyScore(result, el, el.parentElement || el, "x", ranking);
     });
   } catch {
     // Reset so items can be retried
@@ -61,7 +61,7 @@ const observer = new MutationObserver(() => {
 (async () => {
   await loadSettings();
   void processX();
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.querySelector("main") || document.body, { childList: true, subtree: true });
   onModelReady(() => void processX());
   onCategoriesChanged(() => void processX());
 

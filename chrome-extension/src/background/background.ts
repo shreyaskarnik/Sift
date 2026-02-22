@@ -217,146 +217,73 @@ async function loadModels(): Promise<void> {
   await loadEmbeddingModel();
 }
 
-interface LensProfile {
-  label: string;
-  include: string[];
-  exclude: string[];
+function getScoreLevel(score: number): string {
+  if (score >= 0.8) return "Strong";
+  if (score >= 0.5) return "Partial";
+  if (score >= 0.2) return "Weak";
+  return "Very weak";
 }
 
-const LENS_PROFILES: Record<string, LensProfile> = {
-  news: {
-    label: "News / Social Feed",
-    include: ["launch", "release", "open source", "security", "research", "startup", "science"],
-    exclude: ["celebrity", "gossip", "betting", "odds"],
-  },
-  "ai-research": {
-    label: "AI Research",
-    include: [
-      "model", "llm", "transformer", "benchmark", "paper", "arxiv", "inference",
-      "training", "agent", "embedding", "openai", "anthropic", "gemma",
-    ],
-    exclude: ["earnings", "celebrity", "sports", "gossip"],
-  },
-  startups: {
-    label: "Startups",
-    include: ["startup", "funding", "seed", "series a", "series b", "founder", "acquisition", "ipo"],
-    exclude: ["paper", "arxiv", "celebrity"],
-  },
-  "deep-tech": {
-    label: "Deep Tech",
-    include: ["infrastructure", "compiler", "kernel", "database", "distributed", "chip", "hardware", "gpu"],
-    exclude: ["gossip", "celebrity", "opinion"],
-  },
-  science: {
-    label: "Science",
-    include: ["study", "discovery", "researchers", "experiment", "physics", "biology", "chemistry", "astronomy"],
-    exclude: ["funding round", "ipo", "acquisition"],
-  },
-};
-
-const BROAD_NEWS_TERMS = [
-  "joins", "announces", "launches", "new", "today", "update", "report", "latest", "improves",
-];
-
-function getScoreLevel(score: number): "strong" | "moderate" | "weak" | "very weak" {
-  if (score >= 0.8) return "strong";
-  if (score >= 0.5) return "moderate";
-  if (score >= 0.2) return "weak";
-  return "very weak";
-}
-
-function humanizeAnchorLabel(anchor: string): string {
+function resolveLabel(anchor: string): string {
+  const entry = currentCategoryMap[anchor];
+  if (entry) return entry.label;
   const normalized = anchor.replace(/[_-]+/g, " ").trim().toLowerCase();
   if (!normalized) return "Category";
   return normalized.replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
-function resolveLensProfile(anchor: string): LensProfile {
-  if (LENS_PROFILES[anchor]) return LENS_PROFILES[anchor];
-  const fallbackLabel = humanizeAnchorLabel(anchor);
-  return { label: fallbackLabel, include: [], exclude: [] };
+function buildDeterministicExplanation(
+  score: number,
+  anchor: string,
+  ranking?: PresetRanking,
+): string {
+  const label = resolveLabel(anchor);
+  const clamped = Math.max(0, Math.min(1, score));
+  const level = getScoreLevel(clamped);
+
+  if (!ranking || ranking.ranks.length < 2) {
+    return `${level} fit for ${label}.`;
+  }
+
+  const top = ranking.top;
+  const topLabel = resolveLabel(top.anchor);
+  const second = ranking.ranks[1];
+  const secondLabel = resolveLabel(second.anchor);
+  const isTopMatch = anchor === top.anchor;
+  const gap = top.score - second.score;
+
+  if (isTopMatch) {
+    if (clamped >= 0.8) {
+      return gap >= 0.1
+        ? `Strong fit for ${topLabel}. Clearly ahead of ${secondLabel} (${second.score.toFixed(2)}).`
+        : `Strong fit for ${topLabel}. Close with ${secondLabel} (${second.score.toFixed(2)}).`;
+    }
+    if (clamped >= 0.5) {
+      return `Partial fit for ${topLabel}. Runner-up: ${secondLabel} (${second.score.toFixed(2)}).`;
+    }
+    if (clamped >= 0.2) {
+      return `Weak fit for ${topLabel} (${top.score.toFixed(2)}). No strong category match.`;
+    }
+    return `Very weak fit. Best match is ${topLabel} at ${top.score.toFixed(2)}.`;
+  }
+
+  // User inspecting a non-top anchor via pill override
+  const anchorRank = ranking.ranks.find((r) => r.anchor === anchor);
+  const anchorScore = anchorRank?.score ?? score;
+  const anchorLevel = getScoreLevel(anchorScore);
+  return `${anchorLevel} fit for ${label} (${anchorScore.toFixed(2)}). Best match: ${topLabel} (${top.score.toFixed(2)}).`;
 }
 
-function matchTerms(titleLower: string, terms: string[]): string[] {
-  const hits: string[] = [];
-  for (const term of terms) {
-    const normalized = term.toLowerCase();
-    if (titleLower.includes(normalized) && !hits.includes(term)) {
-      hits.push(term);
-    }
-  }
-  return hits;
-}
-
-function formatList(values: string[]): string {
-  const clean = values.slice(0, 2);
-  if (clean.length === 0) return "";
-  if (clean.length === 1) return clean[0];
-  return `${clean[0]} and ${clean[1]}`;
-}
-
-function hasBroadSignal(titleLower: string, titleWordCount: number): boolean {
-  if (titleWordCount <= 5) return true;
-  const broadHits = matchTerms(titleLower, BROAD_NEWS_TERMS);
-  return broadHits.length >= 2;
-}
-
-function buildDeterministicExplanation(title: string, score: number, anchor: string): string {
-  const profile = resolveLensProfile(anchor);
-  const normalizedScore = Math.max(0, Math.min(1, score));
-  const level = getScoreLevel(normalizedScore);
-  const titleLower = title.toLowerCase();
-  const titleWordCount = titleLower.split(/\s+/).filter(Boolean).length;
-  const includeHits = matchTerms(titleLower, profile.include);
-  const excludeHits = matchTerms(titleLower, profile.exclude);
-  const broad = hasBroadSignal(titleLower, titleWordCount);
-
-  if (level === "strong") {
-    if (includeHits.length > 0) {
-      return `Strong fit for ${profile.label}. It directly mentions ${formatList(includeHits)}.`;
-    }
-    return `Strong fit for ${profile.label}. The topic is closely aligned.`;
-  }
-
-  if (level === "moderate") {
-    if (includeHits.length > 0 && broad) {
-      return `Partial fit for ${profile.label}. It mentions ${formatList(includeHits)}, but the title is broad.`;
-    }
-    if (includeHits.length > 0) {
-      return `Partial fit for ${profile.label}. There is overlap with ${formatList(includeHits)}.`;
-    }
-    if (excludeHits.length > 0) {
-      return `Partial fit. It has some overlap, but leans toward ${formatList(excludeHits)}.`;
-    }
-    return `Partial fit for ${profile.label}. Related, but not very specific.`;
-  }
-
-  if (level === "weak") {
-    if (excludeHits.length > 0) {
-      return `Weak fit for ${profile.label}. This looks more about ${formatList(excludeHits)}.`;
-    }
-    if (includeHits.length > 0) {
-      return `Weak fit for ${profile.label}. Only light overlap via ${formatList(includeHits)}.`;
-    }
-    return `Weak fit for ${profile.label}. Few clear lens signals.`;
-  }
-
-  if (excludeHits.length > 0) {
-    return `Very weak fit for ${profile.label}. Mostly about ${formatList(excludeHits)}.`;
-  }
-  if (broad) {
-    return `Very weak fit for ${profile.label}. The title is broad and generic.`;
-  }
-  return `Very weak fit for ${profile.label}. It appears off-topic.`;
-}
-
-async function explainScore(text: string, score: number, anchorId?: string): Promise<string> {
+async function explainScore(
+  text: string,
+  score: number,
+  anchorId?: string,
+  ranking?: PresetRanking,
+): Promise<string> {
   const title = text.replace(/\s+/g, " ").trim();
-  if (!title) {
-    return "No title text available to inspect.";
-  }
+  if (!title) return "No title text available to inspect.";
   const anchor = anchorId || DEFAULT_QUERY_ANCHOR;
-  return buildDeterministicExplanation(title, score, anchor);
+  return buildDeterministicExplanation(score, anchor, ranking);
 }
 
 // ---------------------------------------------------------------------------
@@ -853,7 +780,7 @@ chrome.runtime.onMessage.addListener(
           return;
         }
         const safeScore = Number.isFinite(p.score) ? p.score : 0;
-        explainScore(p.text, safeScore, p.anchorId)
+        explainScore(p.text, safeScore, p.anchorId, p.ranking)
           .then((explanation) => sendResponse({ explanation }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;

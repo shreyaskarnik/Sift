@@ -23,7 +23,7 @@
     <div class="hero-card">
       <div class="hero-header">
         <span class="hero-label">🧭 Current Page</span>
-        <label class="toggle toggle-compact">
+        <label class="toggle toggle-compact" title="Toggle page scoring">
           <input type="checkbox" id="toggle-page-score">
           <span class="toggle-switch"></span>
         </label>
@@ -83,6 +83,16 @@
     <details class="fold fold-categories">
       <summary>🏷️ Categories <span id="category-count-badge" class="fold-badge"></span></summary>
       <div class="fold-content">
+        <div class="topk-row">
+          <span>Show top</span>
+          <select id="topk-select">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="5">5</option>
+          </select>
+          <span>per item</span>
+        </div>
         <div id="category-grid" class="category-grid"></div>
       </div>
     </details>

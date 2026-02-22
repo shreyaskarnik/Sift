@@ -66,7 +66,7 @@ const CSS = /* css */ `
 
 /* ── Score chip — inline, works inside any container ── */
 .ss-score-chip {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   vertical-align: baseline;
   margin-left: 6px;
@@ -80,6 +80,11 @@ const CSS = /* css */ `
   background: hsla(var(--ss-h, 45), 40%, 50%, 0.08);
   border: 1px solid hsla(var(--ss-h, 45), 30%, 50%, 0.15);
   transition: opacity 0.2s ease;
+  /* Guard against host flex/layout rules (notably X) stretching chip full-width */
+  width: max-content !important;
+  max-width: max-content !important;
+  flex: 0 0 auto !important;
+  align-self: flex-start !important;
 }
 
 /* HIGH (>=0.80): always visible */
@@ -93,22 +98,28 @@ const CSS = /* css */ `
 }
 
 .ss-scored:hover .ss-score-chip[data-band="GOOD"],
-.ss-scored:focus-within .ss-score-chip[data-band="GOOD"] {
+.ss-scored:focus-within .ss-score-chip[data-band="GOOD"],
+.ss-vote-host:hover .ss-score-chip[data-band="GOOD"],
+.ss-vote-host:focus-within .ss-score-chip[data-band="GOOD"] {
   opacity: 0.7;
 }
 
 /* ── Vote buttons — hidden until hover ── */
 .ss-votes {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   margin-left: 4px;
   vertical-align: baseline;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
+  flex: 0 0 auto !important;
+  align-self: flex-start !important;
 }
 
 .ss-scored:hover .ss-votes,
+.ss-vote-host:hover .ss-votes,
+.ss-vote-host:focus-within .ss-votes,
 .ss-votes:has(.ss-on) {
   opacity: 1;
   pointer-events: auto;
@@ -204,7 +215,7 @@ const CSS = /* css */ `
 
 /* ── Explain tooltip (appended to body) ── */
 .ss-explain-tip {
-  position: absolute;
+  position: fixed;
   z-index: 2147483647;
   max-width: 360px;
   padding: 10px 12px;

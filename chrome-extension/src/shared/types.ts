@@ -105,7 +105,8 @@ export interface SetLabelsPayload {
 export interface ExplainScorePayload {
   text: string;
   score: number;
-  anchorId?: string;  // winning anchor from ranking
+  anchorId?: string;
+  ranking?: PresetRanking;
 }
 
 /** Payload for GET_PAGE_SCORE */

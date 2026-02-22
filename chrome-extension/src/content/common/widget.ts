@@ -1,4 +1,4 @@
-import { MSG, STORAGE_KEYS, ANCHOR_MIN_SCORE } from "../../shared/constants";
+import { MSG, STORAGE_KEYS, ANCHOR_MIN_SCORE, DEFAULT_TOP_K_PILLS } from "../../shared/constants";
 import type { VibeResult, PresetRanking, PresetRank, CategoryMap } from "../../shared/types";
 import { scoreToHue, getScoreBand } from "../../shared/scoring-utils";
 import { injectStyles } from "./styles";
@@ -13,6 +13,9 @@ let sensitivity = 50;
 /** Active category map. Cached, updated via storage listener. */
 let categoryMap: CategoryMap = {};
 
+/** Number of category pills to show per item. */
+let topKPills: number = DEFAULT_TOP_K_PILLS;
+
 // Load category map from storage
 chrome.storage.local.get(STORAGE_KEYS.CATEGORY_MAP).then((stored) => {
   categoryMap = (stored[STORAGE_KEYS.CATEGORY_MAP] as CategoryMap) ?? {};
@@ -24,9 +27,11 @@ export async function loadSettings(): Promise<void> {
     const stored = await chrome.storage.local.get([
       STORAGE_KEYS.SENSITIVITY,
       STORAGE_KEYS.SITE_ENABLED,
+      STORAGE_KEYS.TOP_K_PILLS,
     ]);
     sensitivity = stored[STORAGE_KEYS.SENSITIVITY] ?? 50;
     siteEnabled = stored[STORAGE_KEYS.SITE_ENABLED] ?? { hn: true, reddit: true, x: true };
+    topKPills = (stored[STORAGE_KEYS.TOP_K_PILLS] as number) ?? DEFAULT_TOP_K_PILLS;
   } catch { /* use default */ }
 }
 
@@ -72,6 +77,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes[STORAGE_KEYS.CATEGORY_MAP]) {
     categoryMap = (changes[STORAGE_KEYS.CATEGORY_MAP].newValue as CategoryMap) ?? {};
   }
+  if (changes[STORAGE_KEYS.TOP_K_PILLS]) {
+    topKPills = (changes[STORAGE_KEYS.TOP_K_PILLS].newValue as number) ?? DEFAULT_TOP_K_PILLS;
+  }
 });
 
 /**
@@ -113,14 +121,11 @@ function applySensitivityToExistingScores(): void {
 /** Track the active tooltip so only one shows at a time */
 let activeTip: HTMLElement | null = null;
 
-/** Extract visible pills from a PresetRanking (top + optional second if ambiguous). */
+/** Extract top-K visible pills from a PresetRanking, filtered by minimum score. */
 function rankingToPills(ranking: PresetRanking): PresetRank[] {
-  const pills: PresetRank[] = [ranking.top];
-  const second = ranking.ranks[1];
-  if (second && second.score >= ANCHOR_MIN_SCORE && ranking.ambiguous) {
-    pills.push(second);
-  }
-  return pills;
+  return ranking.ranks
+    .slice(0, topKPills)
+    .filter((r) => r === ranking.top || r.score >= ANCHOR_MIN_SCORE);
 }
 
 /**
@@ -148,7 +153,7 @@ function createExplainButton(
     try {
       const resp = await chrome.runtime.sendMessage({
         type: MSG.EXPLAIN_SCORE,
-        payload: { text, score, anchorId },
+        payload: { text, score, anchorId, ranking },
       });
       if (!document.body.contains(tip)) return;
       tip.classList.remove("ss-thinking");
@@ -233,8 +238,14 @@ function createExplainButton(
     }
 
     tip.appendChild(body);
-    tip.style.top = `${rect.bottom + window.scrollY + 4}px`;
-    tip.style.left = `${rect.left + window.scrollX}px`;
+    // Position with fixed coordinates; flip above if near viewport bottom
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 200) {
+      tip.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+    } else {
+      tip.style.top = `${rect.bottom + 4}px`;
+    }
+    tip.style.left = `${Math.min(rect.left, window.innerWidth - 380)}px`;
     document.body.appendChild(tip);
     activeTip = tip;
 
@@ -286,17 +297,24 @@ export function applyScore(
   el.classList.add("ss-scored");
 
   // Score chip for HIGH / GOOD bands — inline, attached to visual anchor
+  const anchor = voteAnchor || el;
+  if (anchor !== el) {
+    // When controls/chips are mounted outside the scored node (e.g. X),
+    // mark host so hover rules can still reveal actions.
+    anchor.classList.add("ss-vote-host");
+    anchor.style.setProperty("--ss-h", String(hue));
+  }
+
   const band = getScoreBand(score);
   if (band === "HIGH" || band === "GOOD") {
     const chip = document.createElement("span");
     chip.className = "ss-score-chip";
     chip.dataset.band = band;
     chip.textContent = `${band} ${score.toFixed(2)}`;
-    (voteAnchor || el).appendChild(chip);
+    anchor.appendChild(chip);
   }
 
   if (source) {
-    const anchor = voteAnchor || el;
     const buttons = createLabelButtons(result.text, source, ranking);
     buttons.appendChild(createExplainButton(result.text, score, ranking, buttons));
     anchor.appendChild(buttons);
