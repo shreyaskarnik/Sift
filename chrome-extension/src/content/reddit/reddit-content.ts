@@ -6,6 +6,7 @@ import {
   loadSettings,
   isSiteEnabled,
   onModelReady,
+  onCategoriesChanged,
   resetSiftMarkers,
 } from "../common/widget";
 
@@ -101,6 +102,7 @@ const observer = new MutationObserver(() => {
   void processReddit();
   observer.observe(document.body, { childList: true, subtree: true });
   onModelReady(() => void processReddit());
+  onCategoriesChanged(() => void processReddit());
 
   chrome.storage.onChanged.addListener((changes) => {
     if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;

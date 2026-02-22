@@ -6,6 +6,7 @@ import {
   loadSettings,
   isSiteEnabled,
   onModelReady,
+  onCategoriesChanged,
   resetSiftMarkers,
 } from "../common/widget";
 
@@ -54,6 +55,7 @@ async function processHN() {
   void processHN();
   // Re-process when model becomes ready (handles cold start timing)
   onModelReady(() => void processHN());
+  onCategoriesChanged(() => void processHN());
 
   chrome.storage.onChanged.addListener((changes) => {
     if (!changes[STORAGE_KEYS.SITE_ENABLED]) return;

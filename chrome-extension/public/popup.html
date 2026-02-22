@@ -64,23 +64,12 @@
           <label>🎯 Focus Lens</label>
           <div class="lens-active" id="lens-active">
             <span class="lens-icon">◎</span>
-            <span class="lens-text" id="lens-text">News / Social Feed</span>
+            <span class="lens-text" id="lens-text">News</span>
             <button class="lens-edit-btn" id="lens-edit-btn" title="Change lens">✎</button>
           </div>
           <div class="lens-editor" id="lens-editor" style="display:none">
             <div class="lens-presets" id="lens-presets">
-              <button class="lens-chip" data-anchor="MY_FAVORITE_NEWS" data-label="News / Social Feed">News / Social Feed</button>
-              <button class="lens-chip" data-anchor="AI_RESEARCH" data-label="AI Research">AI Research</button>
-              <button class="lens-chip" data-anchor="STARTUP_NEWS" data-label="Startups">Startups</button>
-              <button class="lens-chip" data-anchor="DEEP_TECH" data-label="Deep Tech">Deep Tech</button>
-              <button class="lens-chip" data-anchor="SCIENCE_DISCOVERIES" data-label="Science">Science</button>
-            </div>
-            <div class="lens-custom">
-              <span class="lens-custom-label">Custom</span>
-              <div class="input-row">
-                <input type="text" id="anchor-input" placeholder="YOUR_CUSTOM_ANCHOR">
-                <button id="save-anchor">Set</button>
-              </div>
+              <!-- Populated dynamically from active categories -->
             </div>
           </div>
           <label for="sensitivity-slider">Dimming <span id="sensitivity-value" class="slider-value">50%</span></label>
@@ -99,6 +88,13 @@
         <footer>
           <p>Sift through the noise — powered by EmbeddingGemma.</p>
         </footer>
+      </div>
+    </details>
+
+    <details class="fold fold-categories">
+      <summary>🏷️ Categories <span id="category-count-badge" class="fold-badge"></span></summary>
+      <div class="fold-content">
+        <div id="category-grid" class="category-grid"></div>
       </div>
     </details>
 

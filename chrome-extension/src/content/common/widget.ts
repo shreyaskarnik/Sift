@@ -1,5 +1,5 @@
-import { MSG, STORAGE_KEYS, ANCHOR_LABELS, ANCHOR_MIN_SCORE } from "../../shared/constants";
-import type { VibeResult, PresetRanking, PresetRank } from "../../shared/types";
+import { MSG, STORAGE_KEYS, ANCHOR_MIN_SCORE } from "../../shared/constants";
+import type { VibeResult, PresetRanking, PresetRank, CategoryMap } from "../../shared/types";
 import { scoreToHue, getScoreBand } from "../../shared/scoring-utils";
 import { injectStyles } from "./styles";
 import { createLabelButtons } from "./label-buttons";
@@ -9,6 +9,14 @@ let siteEnabled: Record<string, boolean> = { hn: true, reddit: true, x: true };
 
 /** Sensitivity 0-100. Cached, updated via storage listener. */
 let sensitivity = 50;
+
+/** Active category map. Cached, updated via storage listener. */
+let categoryMap: CategoryMap = {};
+
+// Load category map from storage
+chrome.storage.local.get(STORAGE_KEYS.CATEGORY_MAP).then((stored) => {
+  categoryMap = (stored[STORAGE_KEYS.CATEGORY_MAP] as CategoryMap) ?? {};
+});
 
 /** Load settings from storage. Call once before scoring. */
 export async function loadSettings(): Promise<void> {
@@ -52,13 +60,17 @@ try {
 } catch { /* non-critical */ }
 
 // Live-update when user changes settings in the popup
-chrome.storage.onChanged.addListener((changes) => {
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
   if (changes[STORAGE_KEYS.SENSITIVITY]) {
     sensitivity = changes[STORAGE_KEYS.SENSITIVITY].newValue ?? 50;
     applySensitivityToExistingScores();
   }
   if (changes[STORAGE_KEYS.SITE_ENABLED]) {
     siteEnabled = changes[STORAGE_KEYS.SITE_ENABLED].newValue ?? { hn: true, reddit: true, x: true };
+  }
+  if (changes[STORAGE_KEYS.CATEGORY_MAP]) {
+    categoryMap = (changes[STORAGE_KEYS.CATEGORY_MAP].newValue as CategoryMap) ?? {};
   }
 });
 
@@ -126,6 +138,29 @@ function createExplainButton(
   btn.textContent = "?";
   btn.title = "Inspect score";
 
+  // Persists across tooltip reopens so the user's pill selection is remembered
+  let overrideAnchor: string | undefined;
+
+  /** Fetch and display explanation for the given anchor. */
+  async function fetchExplanation(body: HTMLElement, tip: HTMLElement, anchorId?: string): Promise<void> {
+    body.textContent = "Analyzing score\u2026";
+    tip.classList.add("ss-thinking");
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: MSG.EXPLAIN_SCORE,
+        payload: { text, score, anchorId },
+      });
+      if (!document.body.contains(tip)) return;
+      tip.classList.remove("ss-thinking");
+      body.textContent = resp?.error || resp?.explanation || "No explanation available.";
+    } catch {
+      if (document.body.contains(tip)) {
+        tip.classList.remove("ss-thinking");
+        body.textContent = "Inspector unavailable.";
+      }
+    }
+  }
+
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -161,6 +196,9 @@ function createExplainButton(
 
     tip.append(header);
 
+    // Determine which anchor is currently active (override or model-detected top)
+    const effectiveAnchor = overrideAnchor || ranking?.top.anchor;
+
     // Preset ranking pills — own row between header and body
     if (ranking) {
       const pills = rankingToPills(ranking);
@@ -169,11 +207,14 @@ function createExplainButton(
       for (const pr of pills) {
         const pill = document.createElement("span");
         pill.className = "ss-inspector-lens";
-        if (pr.anchor === ranking.top.anchor) pill.classList.add("ss-lens-active");
-        pill.textContent = `${ANCHOR_LABELS[pr.anchor] || pr.anchor} ${pr.score.toFixed(2)}`;
-        pill.title = `Score with ${ANCHOR_LABELS[pr.anchor] || pr.anchor} lens`;
+        if (pr.anchor === effectiveAnchor) pill.classList.add("ss-lens-active");
+        const anchorLabel = categoryMap[pr.anchor]?.label ?? pr.anchor;
+        pill.textContent = `${anchorLabel} ${pr.score.toFixed(2)}`;
+        pill.title = `Score with ${anchorLabel} lens`;
         pill.addEventListener("click", (ev) => {
           ev.stopPropagation();
+          // Persist the override for this item
+          overrideAnchor = pr.anchor;
           // Set item-level override on the votes container
           if (votesContainer) {
             (votesContainer as any)._setAnchorOverride?.(pr.anchor);
@@ -183,6 +224,8 @@ function createExplainButton(
             p.classList.remove("ss-lens-active"),
           );
           pill.classList.add("ss-lens-active");
+          // Re-fetch explanation for the newly selected anchor
+          void fetchExplanation(body, tip, pr.anchor);
         });
         lensRow.appendChild(pill);
       }
@@ -195,24 +238,8 @@ function createExplainButton(
     document.body.appendChild(tip);
     activeTip = tip;
 
-    try {
-      const resp = await chrome.runtime.sendMessage({
-        type: MSG.EXPLAIN_SCORE,
-        payload: { text, score, anchorId: ranking?.top.anchor },
-      });
-      if (!document.body.contains(tip)) return; // dismissed while loading
-      tip.classList.remove("ss-thinking");
-      if (resp?.error) {
-        body.textContent = resp.error;
-      } else {
-        body.textContent = resp?.explanation || "No explanation available.";
-      }
-    } catch {
-      if (document.body.contains(tip)) {
-        tip.classList.remove("ss-thinking");
-        body.textContent = "Inspector unavailable.";
-      }
-    }
+    // Fetch explanation for the effective anchor
+    void fetchExplanation(body, tip, effectiveAnchor);
 
     // Dismiss on click outside
     const dismiss = (ev: MouseEvent) => {
@@ -297,5 +324,24 @@ export function resetSiftMarkers(): void {
   document.querySelectorAll<HTMLElement>("[data-sift]").forEach((el) => {
     delete el.dataset.sift;
     el.classList.remove("ss-pending");
+  });
+}
+
+/**
+ * Register a callback that fires when active categories change.
+ * Clears existing scores and markers so items get re-processed.
+ */
+export function onCategoriesChanged(callback: () => void): void {
+  let lastVersion = 0;
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === MSG.CATEGORIES_CHANGED) {
+      const v = message.payload?.categoriesVersion ?? 0;
+      if (v <= lastVersion) return; // stale
+      lastVersion = v;
+      // Clear existing scores so items get re-processed
+      clearAppliedScores();
+      resetSiftMarkers();
+      callback();
+    }
   });
 }

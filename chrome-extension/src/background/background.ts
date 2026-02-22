@@ -20,12 +20,16 @@ import {
   STORAGE_KEYS,
   DEFAULT_QUERY_ANCHOR,
   MODEL_ID,
-  PRESET_ANCHORS,
+  BUILTIN_CATEGORIES,
+  DEFAULT_ACTIVE_IDS,
+
   VIBE_THRESHOLDS,
   LABEL_SCHEMA_VERSION,
   ANCHOR_TIE_GAP,
 } from "../shared/constants";
 import type {
+  CategoryDef,
+  CategoryMap,
   ExtensionMessage,
   ModelStatus,
   VibeResult,
@@ -43,6 +47,7 @@ import type {
   PresetRank,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
+import { migrateLabels } from "./migrations";
 
 // ---------------------------------------------------------------------------
 // Env config
@@ -84,6 +89,17 @@ let modelReady = false;
 let anchorReady = false;
 let loadingPromise: Promise<void> | null = null;
 const presetEmbeddings = new Map<string, Float32Array>();
+let categoriesVersion = 0;
+let currentCategoryMap: CategoryMap = {};
+
+// Restore persisted categoriesVersion so content scripts don't ignore broadcasts
+// after a service-worker restart.
+chrome.storage.local.get(STORAGE_KEYS.CATEGORIES_VERSION).then((stored) => {
+  const v = stored[STORAGE_KEYS.CATEGORIES_VERSION];
+  if (typeof v === "number" && v > categoriesVersion) {
+    categoriesVersion = v;
+  }
+});
 
 // Keep the latest anchor available even before model load completes.
 chrome.storage.local.get(STORAGE_KEYS.ANCHOR).then((stored) => {
@@ -93,15 +109,11 @@ chrome.storage.local.get(STORAGE_KEYS.ANCHOR).then((stored) => {
   }
 });
 
-// Migrate labels: wipe if schema version is outdated
-chrome.storage.local.get([STORAGE_KEYS.LABEL_SCHEMA]).then((stored) => {
+// Migrate labels on schema version change
+chrome.storage.local.get([STORAGE_KEYS.LABEL_SCHEMA, STORAGE_KEYS.LABELS]).then(async (stored) => {
   const storedVersion = stored[STORAGE_KEYS.LABEL_SCHEMA] ?? 0;
   if (storedVersion < LABEL_SCHEMA_VERSION) {
-    console.log(`[bg] Label schema ${storedVersion} → ${LABEL_SCHEMA_VERSION}: wiping old labels`);
-    chrome.storage.local.set({
-      [STORAGE_KEYS.LABELS]: [],
-      [STORAGE_KEYS.LABEL_SCHEMA]: LABEL_SCHEMA_VERSION,
-    });
+    await migrateLabels(storedVersion);
   }
 });
 
@@ -192,10 +204,11 @@ async function loadEmbeddingModel(): Promise<void> {
       console.log(`[bg] Embedding model ready (${device})`);
       broadcastStatus({ state: "ready", backend: device });
 
+      // Embed active categories first (populates currentCategoryMap for setAnchor lookup)
+      await embedActiveCategories();
       // Embed the anchor phrase
       const anchor = await loadAnchor();
       await setAnchor(anchor);
-      await embedPresetAnchors();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[bg] Embedding model load error:", message);
@@ -222,12 +235,12 @@ interface LensProfile {
 }
 
 const LENS_PROFILES: Record<string, LensProfile> = {
-  MY_FAVORITE_NEWS: {
+  news: {
     label: "News / Social Feed",
     include: ["launch", "release", "open source", "security", "research", "startup", "science"],
     exclude: ["celebrity", "gossip", "betting", "odds"],
   },
-  AI_RESEARCH: {
+  "ai-research": {
     label: "AI Research",
     include: [
       "model", "llm", "transformer", "benchmark", "paper", "arxiv", "inference",
@@ -235,17 +248,17 @@ const LENS_PROFILES: Record<string, LensProfile> = {
     ],
     exclude: ["earnings", "celebrity", "sports", "gossip"],
   },
-  STARTUP_NEWS: {
+  startups: {
     label: "Startups",
     include: ["startup", "funding", "seed", "series a", "series b", "founder", "acquisition", "ipo"],
     exclude: ["paper", "arxiv", "celebrity"],
   },
-  DEEP_TECH: {
+  "deep-tech": {
     label: "Deep Tech",
     include: ["infrastructure", "compiler", "kernel", "database", "distributed", "chip", "hardware", "gpu"],
     exclude: ["gossip", "celebrity", "opinion"],
   },
-  SCIENCE_DISCOVERIES: {
+  science: {
     label: "Science",
     include: ["study", "discovery", "researchers", "experiment", "physics", "biology", "chemistry", "astronomy"],
     exclude: ["funding round", "ipo", "acquisition"],
@@ -270,8 +283,7 @@ function humanizeAnchorLabel(anchor: string): string {
 }
 
 function resolveLensProfile(anchor: string): LensProfile {
-  const key = anchor.trim().toUpperCase();
-  if (LENS_PROFILES[key]) return LENS_PROFILES[key];
+  if (LENS_PROFILES[anchor]) return LENS_PROFILES[anchor];
   const fallbackLabel = humanizeAnchorLabel(anchor);
   return { label: fallbackLabel, include: [], exclude: [] };
 }
@@ -409,13 +421,69 @@ function mapScoreToVibe(text: string, score: number) {
   return { text, rawScore: score, status, emoji, colorHSL };
 }
 
-async function embedPresetAnchors(): Promise<void> {
+async function embedActiveCategories(): Promise<void> {
   if (!modelReady) return;
-  const vectors = await embed([...PRESET_ANCHORS]);
+
+  // Read active category IDs from storage (default to DEFAULT_ACTIVE_IDS)
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
+    STORAGE_KEYS.CATEGORY_DEFS,
+  ]);
+  const activeIds: string[] = stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] ?? [...DEFAULT_ACTIVE_IDS];
+  const customDefs: CategoryDef[] = stored[STORAGE_KEYS.CATEGORY_DEFS] ?? [];
+
+  // Build lookup: check builtins first, then custom defs
+  const builtinMap = new Map(BUILTIN_CATEGORIES.map((c) => [c.id, c]));
+  const customMap = new Map(customDefs.map((c) => [c.id, c]));
+
+  const activeDefs: CategoryDef[] = [];
+  for (const id of activeIds) {
+    const def = builtinMap.get(id) ?? customMap.get(id);
+    if (def && !def.archived) activeDefs.push(def);
+  }
+
+  if (activeDefs.length === 0) {
+    // Clear stale embeddings and map when no active categories remain
+    presetEmbeddings.clear();
+    currentCategoryMap = {};
+    await chrome.storage.local.set({ [STORAGE_KEYS.CATEGORY_MAP]: {} });
+    categoriesVersion++;
+    await chrome.storage.local.set({ [STORAGE_KEYS.CATEGORIES_VERSION]: categoriesVersion });
+    chrome.runtime.sendMessage({
+      type: MSG.CATEGORIES_CHANGED,
+      payload: { categoriesVersion },
+    }).catch(() => {});
+    return;
+  }
+
+  // Embed all anchor texts (active only)
+  const anchorTexts = activeDefs.map((d) => d.anchorText);
+  const vectors = await embed(anchorTexts);
+
   presetEmbeddings.clear();
-  PRESET_ANCHORS.forEach((anchor, i) => {
-    presetEmbeddings.set(anchor, vectors[i]);
+  activeDefs.forEach((def, i) => {
+    presetEmbeddings.set(def.id, vectors[i]);
   });
+
+  // Build CategoryMap covering ALL known categories (builtins + custom defs),
+  // not just active ones, so archived/inactive IDs resolve in CSV export.
+  const catMap: CategoryMap = {};
+  for (const def of BUILTIN_CATEGORIES) {
+    catMap[def.id] = { label: def.label, anchorText: def.anchorText };
+  }
+  for (const def of customDefs) {
+    catMap[def.id] = { label: def.label, anchorText: def.anchorText };
+  }
+  currentCategoryMap = catMap;
+  await chrome.storage.local.set({ [STORAGE_KEYS.CATEGORY_MAP]: catMap });
+
+  // Notify all contexts — persist version before broadcasting
+  categoriesVersion++;
+  await chrome.storage.local.set({ [STORAGE_KEYS.CATEGORIES_VERSION]: categoriesVersion });
+  chrome.runtime.sendMessage({
+    type: MSG.CATEGORIES_CHANGED,
+    payload: { categoriesVersion },
+  }).catch(() => {});
 }
 
 /**
@@ -456,10 +524,26 @@ async function loadAnchor(): Promise<string> {
 async function setAnchor(anchor: string): Promise<void> {
   console.log(`[bg] Setting anchor: "${anchor}"`);
   currentAnchor = anchor;
-  const [emb] = await embed([anchor]);
+
+  // Look up anchorText from active categories (anchor is a category ID)
+  const catEntry = currentCategoryMap[anchor];
+  const textToEmbed = catEntry?.anchorText ?? anchor;
+
+  const [emb] = await embed([textToEmbed]);
   anchorEmbedding = emb;
   anchorReady = true;
   console.log("[bg] Anchor embedded");
+}
+
+// ---------------------------------------------------------------------------
+// Anchor text stamping
+// ---------------------------------------------------------------------------
+
+function stampAnchorText(label: TrainingLabel, catMap: CategoryMap): TrainingLabel {
+  if (!label.anchorText) {
+    label.anchorText = catMap[label.anchor]?.anchorText ?? label.anchor;
+  }
+  return label;
 }
 
 // ---------------------------------------------------------------------------
@@ -706,6 +790,23 @@ chrome.storage.onChanged.addListener((changes) => {
       void scorePageTitle(activeTabId);
     }
   }
+
+  // Active categories changed — re-embed and reconcile focus lens
+  if (changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS]) {
+    const newActiveIds: string[] = changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS].newValue ?? [];
+    if (!modelReady) return;
+    void (async () => {
+      await embedActiveCategories();
+      // Reconcile focus lens: if currentAnchor is no longer active, switch to first active
+      if (newActiveIds.length > 0 && !newActiveIds.includes(currentAnchor)) {
+        const fallback = newActiveIds[0];
+        console.log(`[bg] Focus lens "${currentAnchor}" removed from active set, switching to "${fallback}"`);
+        currentAnchor = fallback;
+        await chrome.storage.local.set({ [STORAGE_KEYS.ANCHOR]: fallback });
+        await setAnchor(fallback);
+      }
+    })();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -742,6 +843,7 @@ chrome.runtime.onMessage.addListener(
         model = null;
         anchorEmbedding = null;
         presetEmbeddings.clear();
+        currentCategoryMap = {};
         modelReady = false;
         anchorReady = false;
         loadingPromise = null;
@@ -853,13 +955,13 @@ chrome.runtime.onMessage.addListener(
             }
           }
 
-          const stamped: TrainingLabel = {
+          const stamped: TrainingLabel = stampAnchorText({
             ...label,
             anchor: resolvedAnchor,
             autoAnchor: effectiveRanking?.top.anchor,
             autoConfidence: effectiveRanking?.confidence,
             anchorSource,
-          };
+          }, currentCategoryMap);
 
           await enqueueLabelWrite((labels) => { labels.push(stamped); return labels; });
           sendResponse({ success: true });
@@ -876,7 +978,10 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.SET_LABELS: {
         const { labels } = payload as SetLabelsPayload;
-        enqueueLabelWrite(() => (Array.isArray(labels) ? labels : []))
+        const stampedLabels = (Array.isArray(labels) ? labels : []).map(
+          (l) => stampAnchorText({ ...l }, currentCategoryMap),
+        );
+        enqueueLabelWrite(() => stampedLabels)
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
@@ -892,10 +997,9 @@ chrome.runtime.onMessage.addListener(
       case MSG.IMPORT_X_LABELS: {
         const { labels: incoming } = payload as ImportXLabelsPayload;
         const anchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
-        const stamped = (Array.isArray(incoming) ? incoming : []).map((label) => ({
-          ...label,
-          anchor,
-        }));
+        const stamped = (Array.isArray(incoming) ? incoming : []).map((label) =>
+          stampAnchorText({ ...label, anchor }, currentCategoryMap),
+        );
         enqueueLabelWrite((labels) => { labels.push(...stamped); return labels; })
           .then(() => sendResponse({ success: true, count: stamped.length }))
           .catch((err) => sendResponse({ error: String(err) }));
@@ -976,6 +1080,11 @@ chrome.runtime.onMessage.addListener(
       }
 
       case MSG.MODEL_STATUS: {
+        // Ignore — we are the source
+        break;
+      }
+
+      case MSG.CATEGORIES_CHANGED: {
         // Ignore — we are the source
         break;
       }

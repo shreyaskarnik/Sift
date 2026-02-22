@@ -702,6 +702,66 @@ button.danger:hover {
   color: var(--text);
 }
 
+/* ── Category Picker ── */
+
+.fold-categories .fold-content {
+  padding-top: 10px;
+}
+
+.category-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.category-group-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.category-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.category-chip:hover {
+  border-color: var(--border-hover);
+  color: var(--text-muted);
+}
+
+.category-chip.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--accent-dim);
+}
+
+.category-chip.active:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.category-chip:active {
+  transform: scale(0.95);
+}
+
 /* ── Training Data Stats ── */
 
 #label-counts {

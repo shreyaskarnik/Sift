@@ -1,8 +1,32 @@
-import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_LABELS, ANCHOR_MIN_SCORE } from "../shared/constants";
+import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_MIN_SCORE, BUILTIN_CATEGORIES, DEFAULT_ACTIVE_IDS } from "../shared/constants";
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
-import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking } from "../shared/types";
+import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking, CategoryMap } from "../shared/types";
+
+// ---------------------------------------------------------------------------
+// CategoryMap — loaded from storage, refreshed on change
+// ---------------------------------------------------------------------------
+let categoryMap: CategoryMap = {};
+
+chrome.storage.local.get(STORAGE_KEYS.CATEGORY_MAP).then((stored) => {
+  categoryMap = (stored[STORAGE_KEYS.CATEGORY_MAP] as CategoryMap) ?? {};
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes[STORAGE_KEYS.CATEGORY_MAP]) {
+    categoryMap = (changes[STORAGE_KEYS.CATEGORY_MAP].newValue as CategoryMap) ?? {};
+  }
+  if (changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS]) {
+    const ids = changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS].newValue as string[] | undefined;
+    if (Array.isArray(ids)) {
+      activeIds = ids;
+      buildCategoryGrid();
+      populateLensPresets();
+    }
+  }
+});
 
 // --- DOM Elements ---
 const statusDot = document.getElementById("status-dot")!;
@@ -15,8 +39,6 @@ const lensText = document.getElementById("lens-text")!;
 const lensEditBtn = document.getElementById("lens-edit-btn")!;
 const lensEditor = document.getElementById("lens-editor")!;
 const lensPresets = document.getElementById("lens-presets")!;
-const anchorInput = document.getElementById("anchor-input") as HTMLInputElement;
-const saveAnchorBtn = document.getElementById("save-anchor")!;
 const labelCounts = document.getElementById("label-counts")!;
 const dataReadiness = document.getElementById("data-readiness")!;
 const anchorGapHints = document.getElementById("anchor-gap-hints")!;
@@ -44,6 +66,8 @@ const pageScoreActions = document.getElementById("page-score-actions")!;
 const pageScoreAnchors = document.getElementById("page-score-anchors")!;
 const pageScoreExplain = document.getElementById("page-score-explain")!;
 const labelCountBadge = document.getElementById("label-count-badge")!;
+const categoryGrid = document.getElementById("category-grid")!;
+const categoryCountBadge = document.getElementById("category-count-badge")!;
 
 interface LabelStats {
   total: number;
@@ -73,6 +97,9 @@ const EMPTY_STATS: LabelStats = {
   xImport: 0,
   web: 0,
 };
+
+let activeIds: string[] = [...DEFAULT_ACTIVE_IDS];
+let currentAnchor: string = DEFAULT_QUERY_ANCHOR;
 
 let lastLabels: TrainingLabel[] = [];
 let lastLabelStats: LabelStats = EMPTY_STATS;
@@ -138,8 +165,7 @@ function getCollectionUrl(): string | null {
 }
 
 function updateDataReadiness(stats: LabelStats): void {
-  const anchor = anchorInput.value.trim() || DEFAULT_QUERY_ANCHOR;
-  const triplets = countExportableTriplets(lastLabels, anchor);
+  const triplets = countExportableTriplets(lastLabels, currentAnchor);
   const ready = triplets > 0;
   exportCsvBtn.disabled = !ready;
   renderAnchorGapHints(lastLabels);
@@ -221,7 +247,7 @@ function renderAnchorGapHints(labels: TrainingLabel[]): void {
   for (const gap of gaps) {
     const item = document.createElement("div");
     item.className = "anchor-gap-item";
-    const name = ANCHOR_LABELS[gap.anchor] || gap.anchor;
+    const name = categoryMap[gap.anchor]?.label ?? gap.anchor;
     const needed = gap.missing === "negative" ? "👎 negative" : "👍 positive";
     item.textContent = `${needed} for ${name} (${gap.positives}↑ / ${gap.negatives}↓).`;
     list.appendChild(item);
@@ -230,6 +256,114 @@ function renderAnchorGapHints(labels: TrainingLabel[]): void {
   anchorGapHints.appendChild(list);
   anchorGapHints.style.display = "block";
   anchorGapHints.classList.add("visible");
+}
+
+// ---------------------------------------------------------------------------
+// Category picker + dynamic lens presets
+// ---------------------------------------------------------------------------
+
+const GROUP_LABELS: Record<string, string> = {
+  tech: "Tech",
+  world: "World",
+  lifestyle: "Lifestyle",
+};
+
+function populateLensPresets(): void {
+  lensPresets.textContent = "";
+  for (const id of activeIds) {
+    const cat = BUILTIN_CATEGORIES.find((c) => c.id === id);
+    if (!cat) continue;
+    const chip = document.createElement("button");
+    chip.className = "lens-chip";
+    chip.type = "button";
+    chip.dataset.anchor = cat.id;
+    chip.dataset.label = cat.label;
+    chip.textContent = cat.label;
+    lensPresets.appendChild(chip);
+  }
+  // Re-highlight the active chip
+  updateLensDisplay(currentAnchor);
+}
+
+function buildCategoryGrid(): void {
+  categoryGrid.textContent = "";
+
+  // Group categories
+  const groups = new Map<string, typeof BUILTIN_CATEGORIES[number][]>();
+  for (const cat of BUILTIN_CATEGORIES) {
+    const g = cat.group || "general";
+    const list = groups.get(g) ?? [];
+    list.push(cat);
+    groups.set(g, list);
+  }
+
+  // Render ungrouped first, then tech, world, lifestyle
+  const order = ["general", "tech", "world", "lifestyle"];
+  for (const groupKey of order) {
+    const cats = groups.get(groupKey);
+    if (!cats || cats.length === 0) continue;
+
+    const section = document.createElement("div");
+    section.className = "category-group";
+
+    if (groupKey !== "general") {
+      const label = document.createElement("div");
+      label.className = "category-group-label";
+      label.textContent = GROUP_LABELS[groupKey] || groupKey;
+      section.appendChild(label);
+    }
+
+    const chipsContainer = document.createElement("div");
+    chipsContainer.className = "category-chips";
+
+    for (const cat of cats) {
+      const chip = document.createElement("button");
+      chip.className = "category-chip";
+      chip.type = "button";
+      chip.dataset.id = cat.id;
+      chip.textContent = cat.label;
+
+      if (activeIds.includes(cat.id)) chip.classList.add("active");
+
+      chip.addEventListener("click", () => void toggleCategory(cat.id));
+      chipsContainer.appendChild(chip);
+    }
+
+    section.appendChild(chipsContainer);
+    categoryGrid.appendChild(section);
+  }
+
+  categoryCountBadge.textContent = `${activeIds.length}`;
+}
+
+async function toggleCategory(id: string): Promise<void> {
+  const idx = activeIds.indexOf(id);
+
+  if (idx >= 0) {
+    // Deactivating — enforce min 1
+    if (activeIds.length <= 1) {
+      showToast("At least one category must be active.", { type: "error" });
+      return;
+    }
+    activeIds.splice(idx, 1);
+  } else {
+    activeIds.push(id);
+  }
+
+  // Persist — background picks up the change via storage.onChanged
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.ACTIVE_CATEGORY_IDS]: activeIds,
+  });
+
+  // Focus lens reconciliation: if current anchor was just deactivated, switch to first active
+  if (!activeIds.includes(currentAnchor)) {
+    const newLens = activeIds[0] || DEFAULT_QUERY_ANCHOR;
+    void applyAnchor(newLens);
+    showToast(`Lens switched to ${getLabelForAnchor(newLens)}.`, { type: "info" });
+  }
+
+  buildCategoryGrid();
+  populateLensPresets();
 }
 
 // --- Initialize ---
@@ -242,9 +376,17 @@ async function init() {
     STORAGE_KEYS.SENSITIVITY,
     STORAGE_KEYS.SITE_ENABLED,
     STORAGE_KEYS.PAGE_SCORING_ENABLED,
+    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
   ]);
+
+  // Active categories
+  const savedIds = stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined;
+  if (savedIds && savedIds.length > 0) activeIds = savedIds;
+  buildCategoryGrid();
+  populateLensPresets();
+
   const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
-  anchorInput.value = anchor;
+  currentAnchor = anchor;
   updateLensDisplay(anchor);
 
   // Populate model source: URL takes priority, then model ID
@@ -362,13 +504,12 @@ function updateLensDisplay(anchor: string) {
 lensEditBtn.addEventListener("click", () => {
   const open = lensEditor.style.display !== "none";
   lensEditor.style.display = open ? "none" : "block";
-  if (!open) anchorInput.focus();
 });
 
 // Lens: apply anchor (preset or custom)
 async function applyAnchor(anchor: string) {
   if (!anchor) return;
-  anchorInput.value = anchor;
+  currentAnchor = anchor;
   updateLensDisplay(anchor);
   lensEditor.style.display = "none";
 
@@ -385,14 +526,6 @@ async function applyAnchor(anchor: string) {
     updateDataReadiness(lastLabelStats);
   }
 }
-
-saveAnchorBtn.addEventListener("click", () => {
-  void applyAnchor(anchorInput.value.trim());
-});
-
-anchorInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") void applyAnchor(anchorInput.value.trim());
-});
 
 // Lens: preset chips
 lensPresets.addEventListener("click", (e) => {
@@ -443,14 +576,13 @@ saveModelSourceBtn.addEventListener("click", async () => {
 exportCsvBtn.addEventListener("click", async () => {
   try {
     const labels = await refreshLabelCounts();
-    const anchor = anchorInput.value.trim() || DEFAULT_QUERY_ANCHOR;
 
-    if (countExportableTriplets(labels, anchor) === 0) {
+    if (countExportableTriplets(labels, currentAnchor) === 0) {
       showToast("No anchor group has both positive and negative labels.", { type: "error" });
       return;
     }
 
-    const csv = exportToCSV(labels, anchor);
+    const csv = exportToCSV(labels, currentAnchor, categoryMap);
 
     // Download
     const blob = new Blob([csv], { type: "text/csv" });
@@ -660,7 +792,7 @@ function renderPageScore(resp: PageScoreResponse): void {
         const pill = document.createElement("button");
         pill.className = "page-score-anchor-pill";
         if (pr.anchor === resp.ranking.top.anchor) pill.classList.add("active");
-        const label = ANCHOR_LABELS[pr.anchor] || pr.anchor;
+        const label = categoryMap[pr.anchor]?.label ?? pr.anchor;
         pill.textContent = label;
         pill.title = `Label under ${label}`;
         pill.addEventListener("click", () => {

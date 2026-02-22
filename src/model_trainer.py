@@ -392,9 +392,11 @@ def train_with_dataset(
         taste_tracker = TasteTracker(model, held_out_groups, task_name)
         callbacks.append(taste_tracker)
 
-    # Avoid noisy/ineffective pin_memory on non-CUDA backends (e.g., MPS/CPU).
+    # Device-specific training arguments
     device_str = str(getattr(model, "device", "")).lower()
-    use_pin_memory = device_str.startswith("cuda")
+    is_cpu = device_str.startswith("cpu")
+    is_mps = device_str.startswith("mps")
+    is_cuda = device_str.startswith("cuda")
 
     args = SentenceTransformerTrainingArguments(
         output_dir=output_dir,
@@ -406,7 +408,10 @@ def train_with_dataset(
         logging_steps=train_dataset.num_rows,
         report_to="none",
         save_strategy="no",
-        dataloader_pin_memory=use_pin_memory,
+        dataloader_pin_memory=is_cuda,
+        fp16=is_mps,
+        gradient_checkpointing=is_mps,
+        use_cpu=is_cpu,
     )
 
     trainer = SentenceTransformerTrainer(

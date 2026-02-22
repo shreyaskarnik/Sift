@@ -13,6 +13,7 @@ import sys
 import argparse
 from pathlib import Path
 
+import torch
 from sentence_transformers import SentenceTransformer
 from src.model_trainer import train_with_dataset, split_held_out, get_top_hits, upload_model_to_hub
 from src.config import AppConfig
@@ -242,6 +243,8 @@ def main():
                         help="Random seed for held-out split (default: 42)")
     parser.add_argument("--debug-search", action="store_true",
                         help="Print semantic search rankings after training (debug)")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Force device: cpu, mps, cuda (default: auto-detect)")
     args = parser.parse_args()
 
     if args.epochs <= 0:
@@ -293,8 +296,9 @@ def main():
         )
         sys.exit(1)
 
-    print(f"Loading base model: {AppConfig.MODEL_NAME}")
-    model = SentenceTransformer(AppConfig.MODEL_NAME, model_kwargs={"device_map": "auto"})
+    device = args.device or ("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Loading base model: {AppConfig.MODEL_NAME} (device: {device})")
+    model = SentenceTransformer(AppConfig.MODEL_NAME, device=device)
     print(f"Model loaded on {model.device}")
 
     output_dir = Path(args.output) if args.output else AppConfig.ARTIFACTS_DIR / "sift-finetuned"

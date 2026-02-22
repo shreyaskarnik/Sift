@@ -13,15 +13,30 @@ export interface TrainingLabel {
   label: "positive" | "negative";
   source: "hn" | "reddit" | "x" | "x-import" | "web";
   timestamp: number;
-  /** Resolved anchor (override > auto > fallback). Required in schema v2+. */
+  /** Resolved category ID (override > auto > fallback). Required in schema v2+. */
   anchor: string;
-  /** What the model predicted as best-match anchor. */
+  /** Frozen anchorText at label-save time for training data integrity (schema v3+). */
+  anchorText?: string;
+  /** What the model predicted as best-match category ID. */
   autoAnchor?: string;
   /** Confidence: top1.score - top2.score gap. */
   autoConfidence?: number;
   /** How anchor was resolved. */
   anchorSource?: "auto" | "override" | "fallback";
 }
+
+/** A category definition (built-in or user-created). */
+export interface CategoryDef {
+  id: string;           // immutable, human-readable (e.g. "ai-research")
+  anchorText: string;   // text that gets embedded (e.g. "AI_RESEARCH")
+  label: string;        // display name (e.g. "AI Research")
+  builtin: boolean;     // true = curated library, false = user-created
+  group?: string;       // UI grouping: "tech", "lifestyle", "world"
+  archived?: boolean;   // true = hidden from UI/scoring, labels preserved
+}
+
+/** Lightweight lookup map written to storage for UI contexts. */
+export type CategoryMap = Record<string, { label: string; anchorText: string }>;
 
 /** Model loading status */
 export interface ModelStatus {
