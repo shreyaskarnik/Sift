@@ -18,6 +18,12 @@ On supported sites, Sift dims low-relevance items so the good stuff stands out.
 
 Users can label items (thumbs up/down) to collect training data, export it as CSV, and fine-tune the model with the included Python pipeline.
 
+## At a Glance
+
+<p align="center">
+  <img src="docs/assets/sift-infographic.svg" alt="Sift infographic: local scoring, supported sites, and training loop" width="100%">
+</p>
+
 ## How It Works
 
 1. **Anchor phrase** — You pick a "scoring lens" like `MY_FAVORITE_NEWS` or `AI_RESEARCH`
