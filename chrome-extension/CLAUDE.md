@@ -41,7 +41,7 @@ Content Scripts ──chrome.runtime.sendMessage──► Background Service Wor
     (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                         │
 Popup ──────────chrome.runtime.sendMessage──────────────┘
-    (IIFE)         (GET_STATUS, UPDATE_ANCHOR, etc.)
+    (IIFE)         (GET_STATUS, CATEGORIES_CHANGED, etc.)
 ```
 
 All inter-context communication uses `chrome.runtime.sendMessage` with typed message envelopes (`ExtensionMessage`). Message types are defined in `MSG` constants. The background responds via `sendResponse`; async handlers return `true` to keep the channel open.

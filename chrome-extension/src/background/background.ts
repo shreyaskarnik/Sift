@@ -35,7 +35,6 @@ import type {
   VibeResult,
   TrainingLabel,
   SaveLabelPayload,
-  UpdateAnchorPayload,
   ImportXLabelsPayload,
   SetLabelsPayload,
   ScoreTextsPayload,
@@ -84,7 +83,6 @@ chrome.storage.onChanged.addListener((changes) => {
 let tokenizer: PreTrainedTokenizer | null = null;
 let model: PreTrainedModel | null = null;
 let anchorEmbedding: Float32Array | null = null;
-let currentAnchor = DEFAULT_QUERY_ANCHOR;
 let modelReady = false;
 let anchorReady = false;
 let loadingPromise: Promise<void> | null = null;
@@ -98,14 +96,6 @@ chrome.storage.local.get(STORAGE_KEYS.CATEGORIES_VERSION).then((stored) => {
   const v = stored[STORAGE_KEYS.CATEGORIES_VERSION];
   if (typeof v === "number" && v > categoriesVersion) {
     categoriesVersion = v;
-  }
-});
-
-// Keep the latest anchor available even before model load completes.
-chrome.storage.local.get(STORAGE_KEYS.ANCHOR).then((stored) => {
-  const anchor = stored[STORAGE_KEYS.ANCHOR];
-  if (typeof anchor === "string" && anchor.trim().length > 0) {
-    currentAnchor = anchor.trim();
   }
 });
 
@@ -206,9 +196,8 @@ async function loadEmbeddingModel(): Promise<void> {
 
       // Embed active categories first (populates currentCategoryMap for setAnchor lookup)
       await embedActiveCategories();
-      // Embed the anchor phrase
-      const anchor = await loadAnchor();
-      await setAnchor(anchor);
+      // Embed fallback anchor phrase used only for scoring fallback paths.
+      await setAnchor(DEFAULT_QUERY_ANCHOR);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[bg] Embedding model load error:", message);
@@ -278,7 +267,7 @@ function getScoreLevel(score: number): "strong" | "moderate" | "weak" | "very we
 
 function humanizeAnchorLabel(anchor: string): string {
   const normalized = anchor.replace(/[_-]+/g, " ").trim().toLowerCase();
-  if (!normalized) return "Selected Lens";
+  if (!normalized) return "Category";
   return normalized.replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
@@ -366,7 +355,7 @@ async function explainScore(text: string, score: number, anchorId?: string): Pro
   if (!title) {
     return "No title text available to inspect.";
   }
-  const anchor = anchorId || await loadAnchor();
+  const anchor = anchorId || DEFAULT_QUERY_ANCHOR;
   return buildDeterministicExplanation(title, score, anchor);
 }
 
@@ -509,21 +498,8 @@ function rankPresets(textEmb: Float32Array): PresetRanking | undefined {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Anchor management
-// ---------------------------------------------------------------------------
-
-async function loadAnchor(): Promise<string> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.ANCHOR);
-  const stored = result[STORAGE_KEYS.ANCHOR];
-  return typeof stored === "string" && stored.length > 0
-    ? stored
-    : DEFAULT_QUERY_ANCHOR;
-}
-
 async function setAnchor(anchor: string): Promise<void> {
-  console.log(`[bg] Setting anchor: "${anchor}"`);
-  currentAnchor = anchor;
+  console.log(`[bg] Setting fallback anchor embedding: "${anchor}"`);
 
   // Look up anchorText from active categories (anchor is a category ID)
   const catEntry = currentCategoryMap[anchor];
@@ -791,21 +767,10 @@ chrome.storage.onChanged.addListener((changes) => {
     }
   }
 
-  // Active categories changed — re-embed and reconcile focus lens
+  // Active categories changed — re-embed category embeddings and map
   if (changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS]) {
-    const newActiveIds: string[] = changes[STORAGE_KEYS.ACTIVE_CATEGORY_IDS].newValue ?? [];
     if (!modelReady) return;
-    void (async () => {
-      await embedActiveCategories();
-      // Reconcile focus lens: if currentAnchor is no longer active, switch to first active
-      if (newActiveIds.length > 0 && !newActiveIds.includes(currentAnchor)) {
-        const fallback = newActiveIds[0];
-        console.log(`[bg] Focus lens "${currentAnchor}" removed from active set, switching to "${fallback}"`);
-        currentAnchor = fallback;
-        await chrome.storage.local.set({ [STORAGE_KEYS.ANCHOR]: fallback });
-        await setAnchor(fallback);
-      }
-    })();
+    void embedActiveCategories();
   }
 });
 
@@ -899,24 +864,6 @@ chrome.runtime.onMessage.addListener(
         return;
       }
 
-      case MSG.UPDATE_ANCHOR: {
-        const { anchor } = payload as UpdateAnchorPayload;
-        if (anchor) {
-          currentAnchor = anchor;
-        }
-        if (anchor && modelReady) {
-          chrome.storage.local.set({ [STORAGE_KEYS.ANCHOR]: anchor });
-          // Re-embed anchor in background — don't gate scoring since
-          // rankPresets() uses presetEmbeddings, not anchorEmbedding.
-          setAnchor(anchor)
-            .then(() => sendResponse({ success: true }))
-            .catch((err) => sendResponse({ error: String(err) }));
-          return true;
-        }
-        sendResponse({ ok: true });
-        return;
-      }
-
       case MSG.SAVE_LABEL: {
         const { label, anchorOverride, presetRanking } = payload as SaveLabelPayload;
         if (!label || typeof label.text !== "string") {
@@ -946,11 +893,11 @@ chrome.runtime.onMessage.addListener(
                 anchorSource = "auto";
                 effectiveRanking = ranking;
               } else {
-                resolvedAnchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+                resolvedAnchor = DEFAULT_QUERY_ANCHOR;
                 anchorSource = "fallback";
               }
             } catch {
-              resolvedAnchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+              resolvedAnchor = DEFAULT_QUERY_ANCHOR;
               anchorSource = "fallback";
             }
           }
@@ -996,7 +943,7 @@ chrome.runtime.onMessage.addListener(
 
       case MSG.IMPORT_X_LABELS: {
         const { labels: incoming } = payload as ImportXLabelsPayload;
-        const anchor = currentAnchor || DEFAULT_QUERY_ANCHOR;
+        const anchor = DEFAULT_QUERY_ANCHOR;
         const stamped = (Array.isArray(incoming) ? incoming : []).map((label) =>
           stampAnchorText({ ...label, anchor }, currentCategoryMap),
         );

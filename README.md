@@ -125,12 +125,12 @@ Content Scripts ──chrome.runtime.sendMessage──▸ Background Service Wor
     (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                        │
 Popup ──────────chrome.runtime.sendMessage─────────────┘
-    (IIFE)         (GET_STATUS, UPDATE_ANCHOR)
+    (IIFE)         (GET_STATUS, CATEGORIES_CHANGED)
 ```
 
 - **Background** — Loads EmbeddingGemma via Transformers.js, manages scoring + deterministic inspector rationale, routes messages, stores labels
 - **Content scripts** — Site-specific DOM selectors, MutationObserver for infinite scroll, debounced scoring
-- **Popup** — Settings, lens picker, sensitivity slider, data export
+- **Popup** — Settings, category toggles, sensitivity slider, data export
 
 ## Project Structure
 

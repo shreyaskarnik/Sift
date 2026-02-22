@@ -85,7 +85,6 @@ export const MSG = {
   EXPLAIN_SCORE: "EXPLAIN_SCORE",
 
   // Settings
-  UPDATE_ANCHOR: "UPDATE_ANCHOR",
   RELOAD_MODEL: "RELOAD_MODEL",
 
   // Storage
@@ -105,7 +104,6 @@ export const MSG = {
 /** Storage keys for chrome.storage.local */
 export const STORAGE_KEYS = {
   LABELS: "training_labels",
-  ANCHOR: "query_anchor",
   MODEL_DTYPE: "model_dtype",
   CUSTOM_MODEL_ID: "custom_model_id",
   CUSTOM_MODEL_URL: "custom_model_url",

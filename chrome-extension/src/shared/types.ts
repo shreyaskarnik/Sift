@@ -91,11 +91,6 @@ export interface SaveLabelPayload {
   presetRanking?: PresetRanking;
 }
 
-/** Payload for UPDATE_ANCHOR */
-export interface UpdateAnchorPayload {
-  anchor: string;
-}
-
 /** Payload for IMPORT_X_LABELS */
 export interface ImportXLabelsPayload {
   labels: TrainingLabel[];

@@ -23,7 +23,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (Array.isArray(ids)) {
       activeIds = ids;
       buildCategoryGrid();
-      populateLensPresets();
     }
   }
 });
@@ -34,11 +33,6 @@ const statusLabel = document.getElementById("status-label")!;
 const modelStatus = document.getElementById("model-status")!;
 const progressBarContainer = document.getElementById("progress-bar-container")!;
 const progressBar = document.getElementById("progress-bar")!;
-const lensActive = document.getElementById("lens-active")!;
-const lensText = document.getElementById("lens-text")!;
-const lensEditBtn = document.getElementById("lens-edit-btn")!;
-const lensEditor = document.getElementById("lens-editor")!;
-const lensPresets = document.getElementById("lens-presets")!;
 const labelCounts = document.getElementById("label-counts")!;
 const dataReadiness = document.getElementById("data-readiness")!;
 const anchorGapHints = document.getElementById("anchor-gap-hints")!;
@@ -99,7 +93,6 @@ const EMPTY_STATS: LabelStats = {
 };
 
 let activeIds: string[] = [...DEFAULT_ACTIVE_IDS];
-let currentAnchor: string = DEFAULT_QUERY_ANCHOR;
 
 let lastLabels: TrainingLabel[] = [];
 let lastLabelStats: LabelStats = EMPTY_STATS;
@@ -165,7 +158,7 @@ function getCollectionUrl(): string | null {
 }
 
 function updateDataReadiness(stats: LabelStats): void {
-  const triplets = countExportableTriplets(lastLabels, currentAnchor);
+  const triplets = countExportableTriplets(lastLabels, DEFAULT_QUERY_ANCHOR);
   const ready = triplets > 0;
   exportCsvBtn.disabled = !ready;
   renderAnchorGapHints(lastLabels);
@@ -259,7 +252,7 @@ function renderAnchorGapHints(labels: TrainingLabel[]): void {
 }
 
 // ---------------------------------------------------------------------------
-// Category picker + dynamic lens presets
+// Category picker
 // ---------------------------------------------------------------------------
 
 const GROUP_LABELS: Record<string, string> = {
@@ -267,23 +260,6 @@ const GROUP_LABELS: Record<string, string> = {
   world: "World",
   lifestyle: "Lifestyle",
 };
-
-function populateLensPresets(): void {
-  lensPresets.textContent = "";
-  for (const id of activeIds) {
-    const cat = BUILTIN_CATEGORIES.find((c) => c.id === id);
-    if (!cat) continue;
-    const chip = document.createElement("button");
-    chip.className = "lens-chip";
-    chip.type = "button";
-    chip.dataset.anchor = cat.id;
-    chip.dataset.label = cat.label;
-    chip.textContent = cat.label;
-    lensPresets.appendChild(chip);
-  }
-  // Re-highlight the active chip
-  updateLensDisplay(currentAnchor);
-}
 
 function buildCategoryGrid(): void {
   categoryGrid.textContent = "";
@@ -333,7 +309,9 @@ function buildCategoryGrid(): void {
     categoryGrid.appendChild(section);
   }
 
-  categoryCountBadge.textContent = `${activeIds.length}`;
+  const totalVisible = BUILTIN_CATEGORIES.length;
+  const activeVisible = BUILTIN_CATEGORIES.filter((c) => activeIds.includes(c.id)).length;
+  categoryCountBadge.textContent = `${activeVisible}/${totalVisible}`;
 }
 
 async function toggleCategory(id: string): Promise<void> {
@@ -355,22 +333,13 @@ async function toggleCategory(id: string): Promise<void> {
     [STORAGE_KEYS.ACTIVE_CATEGORY_IDS]: activeIds,
   });
 
-  // Focus lens reconciliation: if current anchor was just deactivated, switch to first active
-  if (!activeIds.includes(currentAnchor)) {
-    const newLens = activeIds[0] || DEFAULT_QUERY_ANCHOR;
-    void applyAnchor(newLens);
-    showToast(`Lens switched to ${getLabelForAnchor(newLens)}.`, { type: "info" });
-  }
-
   buildCategoryGrid();
-  populateLensPresets();
 }
 
 // --- Initialize ---
 async function init() {
   // Load saved settings
   const stored = await chrome.storage.local.get([
-    STORAGE_KEYS.ANCHOR,
     STORAGE_KEYS.CUSTOM_MODEL_ID,
     STORAGE_KEYS.CUSTOM_MODEL_URL,
     STORAGE_KEYS.SENSITIVITY,
@@ -383,11 +352,6 @@ async function init() {
   const savedIds = stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined;
   if (savedIds && savedIds.length > 0) activeIds = savedIds;
   buildCategoryGrid();
-  populateLensPresets();
-
-  const anchor = stored[STORAGE_KEYS.ANCHOR] || DEFAULT_QUERY_ANCHOR;
-  currentAnchor = anchor;
-  updateLensDisplay(anchor);
 
   // Populate model source: URL takes priority, then model ID
   const savedUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string) || "";
@@ -486,55 +450,6 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
 
 // --- Event Handlers ---
 
-// Lens: resolve display label from anchor value
-function getLabelForAnchor(anchor: string): string {
-  const chip = lensPresets.querySelector<HTMLElement>(`[data-anchor="${anchor}"]`);
-  return chip?.dataset.label || anchor;
-}
-
-function updateLensDisplay(anchor: string) {
-  lensText.textContent = getLabelForAnchor(anchor);
-  // Highlight the active preset chip
-  lensPresets.querySelectorAll(".lens-chip").forEach((chip) => {
-    chip.classList.toggle("active", (chip as HTMLElement).dataset.anchor === anchor);
-  });
-}
-
-// Lens: toggle editor
-lensEditBtn.addEventListener("click", () => {
-  const open = lensEditor.style.display !== "none";
-  lensEditor.style.display = open ? "none" : "block";
-});
-
-// Lens: apply anchor (preset or custom)
-async function applyAnchor(anchor: string) {
-  if (!anchor) return;
-  currentAnchor = anchor;
-  updateLensDisplay(anchor);
-  lensEditor.style.display = "none";
-
-  const response = await chrome.runtime.sendMessage({
-    type: MSG.UPDATE_ANCHOR,
-    payload: { anchor },
-  });
-
-  if (response?.error) {
-    showToast(`Failed to update lens: ${response.error}`, { type: "error" });
-  } else {
-    showToast("Focus lens updated.", { type: "success" });
-    // Readiness depends on current anchor — refresh after switch
-    updateDataReadiness(lastLabelStats);
-  }
-}
-
-// Lens: preset chips
-lensPresets.addEventListener("click", (e) => {
-  const chip = (e.target as HTMLElement).closest<HTMLElement>(".lens-chip");
-  if (!chip) return;
-  const anchor = chip.dataset.anchor;
-  if (anchor) void applyAnchor(anchor);
-});
-
 function saveSiteToggles() {
   chrome.storage.local.set({
     [STORAGE_KEYS.SITE_ENABLED]: {
@@ -577,12 +492,12 @@ exportCsvBtn.addEventListener("click", async () => {
   try {
     const labels = await refreshLabelCounts();
 
-    if (countExportableTriplets(labels, currentAnchor) === 0) {
+    if (countExportableTriplets(labels, DEFAULT_QUERY_ANCHOR) === 0) {
       showToast("No anchor group has both positive and negative labels.", { type: "error" });
       return;
     }
 
-    const csv = exportToCSV(labels, currentAnchor, categoryMap);
+    const csv = exportToCSV(labels, DEFAULT_QUERY_ANCHOR, categoryMap);
 
     // Download
     const blob = new Blob([csv], { type: "text/csv" });
@@ -796,7 +711,7 @@ function renderPageScore(resp: PageScoreResponse): void {
         pill.textContent = label;
         pill.title = `Label under ${label}`;
         pill.addEventListener("click", () => {
-          // Item-level override only — no applyAnchor / UPDATE_ANCHOR
+          // Item-level override only — no global scoring mode change
           currentPageAnchorOverride = pr.anchor;
           pageScoreAnchors.querySelectorAll(".page-score-anchor-pill").forEach((p) =>
             p.classList.remove("active"),
