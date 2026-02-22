@@ -76,20 +76,51 @@ def convert_to_onnx(model_dir: Path, output_dir: Path, quantize: bool = True) ->
           model_quantized.onnx  (int8)
           model_q4.onnx         (4-bit block-quantized)
     """
+    import logging
     import shutil
+    import warnings
     from optimum.exporters.onnx import main_export
 
     print("\n--- ONNX Conversion ---")
     print(f"Exporting {model_dir} → {output_dir}...")
 
-    main_export(
-        model_name_or_path=str(model_dir),
-        output=output_dir,
-        task="feature-extraction",
-        device="cpu",
-        library_name="sentence_transformers",
-        do_validation=False,
-    )
+    try:
+        from torch.jit import TracerWarning
+    except Exception:
+        TracerWarning = UserWarning
+
+    # Keep export logs actionable by suppressing known non-critical warnings.
+    export_loggers = ("transformers", "optimum", "torch.onnx", "onnxruntime")
+    prev_logger_levels = {}
+    for name in export_loggers:
+        logger = logging.getLogger(name)
+        prev_logger_levels[name] = logger.level
+        logger.setLevel(logging.ERROR)
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`torch_dtype` is deprecated! Use `dtype` instead!")
+            warnings.filterwarnings(
+                "ignore",
+                message=r"The tokenizer you are loading from .*incorrect regex pattern.*",
+            )
+            warnings.filterwarnings("ignore", category=TracerWarning)
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Exporting aten::index operator of advanced indexing.*",
+                category=UserWarning,
+            )
+            main_export(
+                model_name_or_path=str(model_dir),
+                output=output_dir,
+                task="feature-extraction",
+                device="cpu",
+                dtype="fp32",
+                library_name="sentence_transformers",
+                do_validation=False,
+            )
+    finally:
+        for name, level in prev_logger_levels.items():
+            logging.getLogger(name).setLevel(level)
 
     # optimum puts model.onnx at root; Transformers.js expects onnx/ subdirectory
     onnx_subdir = output_dir / "onnx"
@@ -103,8 +134,8 @@ def convert_to_onnx(model_dir: Path, output_dir: Path, quantize: bool = True) ->
     print(f"ONNX model (fp32): {size_mb:.1f} MB")
 
     if quantize:
-        import logging
-        logging.disable(logging.INFO)
+        prev_disable = logging.root.manager.disable
+        logging.disable(logging.WARNING)
 
         # INT8 dynamic quantization
         try:
@@ -134,7 +165,7 @@ def convert_to_onnx(model_dir: Path, output_dir: Path, quantize: bool = True) ->
         except Exception as e:
             print(f"Q4 quantization failed (non-critical): {e}")
 
-        logging.disable(logging.NOTSET)
+        logging.disable(prev_disable)
 
     print(f"\nTransformers.js model ready at: {output_dir}")
     return output_dir

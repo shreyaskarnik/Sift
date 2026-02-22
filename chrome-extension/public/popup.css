@@ -730,6 +730,37 @@ button.danger:hover {
   background: var(--accent-dim);
 }
 
+.anchor-gap-hints {
+  display: none;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.anchor-gap-hints.visible {
+  display: block;
+}
+
+.anchor-gap-title {
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+  font-weight: 600;
+}
+
+.anchor-gap-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.anchor-gap-item {
+  color: var(--text-muted);
+}
+
 .collect-link {
   display: none;
   margin-top: 6px;

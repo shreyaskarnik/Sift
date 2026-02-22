@@ -72,15 +72,37 @@ def split_held_out(
             train_norms.add(_normalize_text(row[1]))
             train_norms.add(_normalize_text(row[2]))
 
-        # Collect unique held-out texts, excluding near-duplicates of train texts
+        # Collect unique held-out texts, excluding near-duplicates of train texts.
+        # If this leaves one class empty (common with upsampled CSV rows), fall back
+        # to include at least one item from the missing class so taste metrics are meaningful.
         seen_norm: set[str] = set()
         items: list[HeldOutItem] = []
+        candidates: list[tuple[str, bool, str]] = []
         for row in held_rows:
-            for text, is_pos in [(row[1], True), (row[2], False)]:
-                norm = _normalize_text(text)
-                if norm not in seen_norm and norm not in train_norms:
+            candidates.append((row[1], True, _normalize_text(row[1])))
+            candidates.append((row[2], False, _normalize_text(row[2])))
+
+        for text, is_pos, norm in candidates:
+            if norm not in seen_norm and norm not in train_norms:
+                seen_norm.add(norm)
+                items.append(HeldOutItem(text=text, is_positive=is_pos))
+
+        has_pos = any(i.is_positive for i in items)
+        has_neg = any(not i.is_positive for i in items)
+
+        if not has_pos:
+            for text, is_pos, norm in candidates:
+                if is_pos and norm not in seen_norm:
                     seen_norm.add(norm)
-                    items.append(HeldOutItem(text=text, is_positive=is_pos))
+                    items.append(HeldOutItem(text=text, is_positive=True))
+                    break
+
+        if not has_neg:
+            for text, is_pos, norm in candidates:
+                if (not is_pos) and norm not in seen_norm:
+                    seen_norm.add(norm)
+                    items.append(HeldOutItem(text=text, is_positive=False))
+                    break
 
         if items:
             held_out_groups.append(AnchorHeldOutGroup(anchor=anchor, items=items))
@@ -370,6 +392,10 @@ def train_with_dataset(
         taste_tracker = TasteTracker(model, held_out_groups, task_name)
         callbacks.append(taste_tracker)
 
+    # Avoid noisy/ineffective pin_memory on non-CUDA backends (e.g., MPS/CPU).
+    device_str = str(getattr(model, "device", "")).lower()
+    use_pin_memory = device_str.startswith("cuda")
+
     args = SentenceTransformerTrainingArguments(
         output_dir=output_dir,
         prompts=prompts,
@@ -380,6 +406,7 @@ def train_with_dataset(
         logging_steps=train_dataset.num_rows,
         report_to="none",
         save_strategy="no",
+        dataloader_pin_memory=use_pin_memory,
     )
 
     trainer = SentenceTransformerTrainer(

@@ -19,6 +19,7 @@ const anchorInput = document.getElementById("anchor-input") as HTMLInputElement;
 const saveAnchorBtn = document.getElementById("save-anchor")!;
 const labelCounts = document.getElementById("label-counts")!;
 const dataReadiness = document.getElementById("data-readiness")!;
+const anchorGapHints = document.getElementById("anchor-gap-hints")!;
 const collectLink = document.getElementById("collect-link") as HTMLAnchorElement;
 const exportCsvBtn = document.getElementById("export-csv") as HTMLButtonElement;
 const importXInput = document.getElementById("import-x") as HTMLInputElement;
@@ -53,6 +54,13 @@ interface LabelStats {
   x: number;
   xImport: number;
   web: number;
+}
+
+interface AnchorGap {
+  anchor: string;
+  positives: number;
+  negatives: number;
+  missing: "positive" | "negative";
 }
 
 const EMPTY_STATS: LabelStats = {
@@ -134,6 +142,7 @@ function updateDataReadiness(stats: LabelStats): void {
   const triplets = countExportableTriplets(lastLabels, anchor);
   const ready = triplets > 0;
   exportCsvBtn.disabled = !ready;
+  renderAnchorGapHints(lastLabels);
 
   if (ready) {
     dataReadiness.className = "data-readiness ready";
@@ -162,6 +171,65 @@ function updateDataReadiness(stats: LabelStats): void {
   } else {
     collectLink.classList.remove("visible");
   }
+}
+
+function getAnchorGaps(labels: TrainingLabel[]): AnchorGap[] {
+  const groups = new Map<string, { positives: number; negatives: number }>();
+
+  for (const label of labels) {
+    const anchor = (label.anchor || DEFAULT_QUERY_ANCHOR).trim() || DEFAULT_QUERY_ANCHOR;
+    const group = groups.get(anchor) ?? { positives: 0, negatives: 0 };
+    if (label.label === "positive") group.positives += 1;
+    else group.negatives += 1;
+    groups.set(anchor, group);
+  }
+
+  return [...groups.entries()]
+    .map(([anchor, counts]) => {
+      if (counts.positives > 0 && counts.negatives === 0) {
+        return { anchor, positives: counts.positives, negatives: counts.negatives, missing: "negative" as const };
+      }
+      if (counts.negatives > 0 && counts.positives === 0) {
+        return { anchor, positives: counts.positives, negatives: counts.negatives, missing: "positive" as const };
+      }
+      return null;
+    })
+    .filter((gap): gap is AnchorGap => Boolean(gap))
+    .sort((a, b) => (b.positives + b.negatives) - (a.positives + a.negatives));
+}
+
+function renderAnchorGapHints(labels: TrainingLabel[]): void {
+  const gaps = getAnchorGaps(labels);
+
+  if (gaps.length === 0) {
+    anchorGapHints.textContent = "";
+    anchorGapHints.classList.remove("visible");
+    anchorGapHints.style.display = "none";
+    return;
+  }
+
+  anchorGapHints.textContent = "";
+
+  const title = document.createElement("div");
+  title.className = "anchor-gap-title";
+  title.textContent = "To unlock more anchors in CSV:";
+  anchorGapHints.appendChild(title);
+
+  const list = document.createElement("div");
+  list.className = "anchor-gap-list";
+
+  for (const gap of gaps) {
+    const item = document.createElement("div");
+    item.className = "anchor-gap-item";
+    const name = ANCHOR_LABELS[gap.anchor] || gap.anchor;
+    const needed = gap.missing === "negative" ? "👎 negative" : "👍 positive";
+    item.textContent = `${needed} for ${name} (${gap.positives}↑ / ${gap.negatives}↓).`;
+    list.appendChild(item);
+  }
+
+  anchorGapHints.appendChild(list);
+  anchorGapHints.style.display = "block";
+  anchorGapHints.classList.add("visible");
 }
 
 // --- Initialize ---
