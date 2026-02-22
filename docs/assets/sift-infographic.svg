@@ -91,17 +91,23 @@
     <rect x="970" y="190" width="360" height="420" rx="18" fill="#0f172a" stroke="url(#cardBorder)" stroke-width="2"/>
     <text x="998" y="236" fill="#e2e8f0" font-family="DM Sans, Segoe UI, sans-serif" font-size="28" font-weight="700">Why It Matters</text>
 
-    <rect x="998" y="268" width="304" height="86" rx="12" fill="#132033" stroke="#1d4ed8"/>
-    <text x="1018" y="303" fill="#dbeafe" font-family="DM Sans, Segoe UI, sans-serif" font-size="22" font-weight="700">Cut Feed Noise Faster</text>
-    <text x="1018" y="330" fill="#bfdbfe" font-family="DM Sans, Segoe UI, sans-serif" font-size="17">See what is relevant first, skip the rest.</text>
+    <rect x="998" y="268" width="304" height="92" rx="12" fill="#132033" stroke="#1d4ed8"/>
+    <text x="1018" y="302" fill="#dbeafe" font-family="DM Sans, Segoe UI, sans-serif" font-size="21" font-weight="700">Cut Feed Noise Faster</text>
+    <text x="1018" y="327" fill="#bfdbfe" font-family="DM Sans, Segoe UI, sans-serif" font-size="16">
+      <tspan x="1018" dy="0">See what is relevant first,</tspan>
+      <tspan x="1018" dy="20">skip the rest.</tspan>
+    </text>
 
-    <rect x="998" y="370" width="304" height="86" rx="12" fill="#14251f" stroke="#0f766e"/>
-    <text x="1018" y="405" fill="#ccfbf1" font-family="DM Sans, Segoe UI, sans-serif" font-size="22" font-weight="700">Personalized by Labels</text>
-    <text x="1018" y="432" fill="#99f6e4" font-family="DM Sans, Segoe UI, sans-serif" font-size="17">Your votes shape what gets promoted.</text>
+    <rect x="998" y="372" width="304" height="92" rx="12" fill="#14251f" stroke="#0f766e"/>
+    <text x="1018" y="406" fill="#ccfbf1" font-family="DM Sans, Segoe UI, sans-serif" font-size="21" font-weight="700">Personalized by Labels</text>
+    <text x="1018" y="431" fill="#99f6e4" font-family="DM Sans, Segoe UI, sans-serif" font-size="16">
+      <tspan x="1018" dy="0">Your votes shape</tspan>
+      <tspan x="1018" dy="20">what gets promoted.</tspan>
+    </text>
 
-    <rect x="998" y="472" width="304" height="86" rx="12" fill="#241d13" stroke="#d97706"/>
-    <text x="1018" y="507" fill="#fef3c7" font-family="DM Sans, Segoe UI, sans-serif" font-size="22" font-weight="700">Bring Your Own Model</text>
-    <text x="1018" y="528" fill="#fde68a" font-family="DM Sans, Segoe UI, sans-serif" font-size="16">
+    <rect x="998" y="476" width="304" height="92" rx="12" fill="#241d13" stroke="#d97706"/>
+    <text x="1018" y="510" fill="#fef3c7" font-family="DM Sans, Segoe UI, sans-serif" font-size="21" font-weight="700">Bring Your Own Model</text>
+    <text x="1018" y="535" fill="#fde68a" font-family="DM Sans, Segoe UI, sans-serif" font-size="16">
       <tspan x="1018" dy="0">Fine-tune, export ONNX,</tspan>
       <tspan x="1018" dy="20">load it in one click.</tspan>
     </text>

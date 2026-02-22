@@ -26,12 +26,12 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 
 ## How It Works
 
-1. **Anchor phrase** — You pick a "scoring lens" like `MY_FAVORITE_NEWS` or `AI_RESEARCH`
+1. **Category selection** — You pick a scoring category like "News" or "AI Research" (25 built-in, custom coming soon)
 2. **Embedding** — Every title/tweet gets embedded by EmbeddingGemma running in your browser (WebGPU/WASM)
-3. **Scoring** — Cosine similarity against the anchor embedding produces a 0–1 score
-4. **Lens detection** — Each item is also compared against all preset lenses; top matches appear as clickable pills in the popup and feed inspector
+3. **Scoring** — Cosine similarity against the category's anchor embedding produces a 0–1 score
+4. **Category detection** — Each item is also compared against all active categories; top matches appear as pills in the popup and feed inspector
 5. **Dimming** — Low scores fade out, high scores stay bright. Sensitivity is adjustable
-6. **Training** — Thumbs up/down on items exports as per-anchor CSV triplets for fine-tuning
+6. **Training** — Thumbs up/down on items exports as per-category CSV triplets for fine-tuning
 
 ## Extension
 
@@ -45,8 +45,8 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - Deterministic score inspector (`?`) with score band + concise rationale
 - Scores HN, Reddit, and X feeds with ambient opacity dimming
 - Per-site toggles and sensitivity slider
-- Scoring lens presets (News, AI Research, Startups, Deep Tech, Science)
-- **Auto-detected lens pills** — popup hero card and feed inspector show which preset lenses match the current page/item, clickable to switch scoring lens
+- 25 built-in categories across tech, world, and lifestyle groups (user-defined categories coming soon)
+- **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
 - Thumbs up/down training labels with per-anchor CSV export
 - X archive import (like.js, bookmark.js)
 - Light/dark mode (follows system)
@@ -79,6 +79,10 @@ For private/development models, use the local server instead (`python train.py -
 ## Training Pipeline
 
 Fine-tune EmbeddingGemma on your collected labels, export to ONNX, and quantize for browser inference.
+
+### Colab (recommended if you don't have a GPU)
+
+Open `train_colab.ipynb` in Google Colab with a T4 GPU runtime. Upload your CSV, run all cells, download the ONNX zip.
 
 ### Install
 
@@ -132,6 +136,7 @@ Popup ──────────chrome.runtime.sendMessage──────
 
 ```
 ├── train.py                    # CLI: fine-tune + ONNX export + quantize + serve
+├── train_colab.ipynb           # Self-contained Colab notebook (GPU training)
 ├── pyproject.toml              # Python dependencies
 ├── src/                        # Python modules (config, trainer, vibe logic)
 └── chrome-extension/
