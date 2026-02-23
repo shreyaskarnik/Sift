@@ -455,10 +455,10 @@ async function refreshTasteProfile(): Promise<void> {
   tasteRefresh.disabled = true;
 
   try {
-    tasteIsStale = false;
     const response: TasteProfileResponse = await chrome.runtime.sendMessage({
       type: MSG.COMPUTE_TASTE_PROFILE,
     });
+    tasteIsStale = false;
     renderTasteProfile(response);
   } catch {
     tasteComputing.style.display = "none";
