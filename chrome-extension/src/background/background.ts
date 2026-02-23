@@ -26,6 +26,12 @@ import {
   VIBE_THRESHOLDS,
   LABEL_SCHEMA_VERSION,
   ANCHOR_TIE_GAP,
+  SCORE_BATCH_SIZE,
+  TASTE_MIN_LABELS,
+  TASTE_TOP_K,
+  TASTE_MAX_PER_CATEGORY,
+  TASTE_NEG_ALPHA,
+  TASTE_MIN_NEGATIVES,
 } from "../shared/constants";
 import type {
   CategoryDef,
@@ -44,8 +50,11 @@ import type {
   PageScoreUpdatedPayload,
   PresetRanking,
   PresetRank,
+  TasteProbeResult,
+  TasteProfileResponse,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
+import { TASTE_PROBES, PROBES_VERSION } from "../shared/taste-probes";
 import { migrateLabels } from "./migrations";
 
 // ---------------------------------------------------------------------------
@@ -318,6 +327,174 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
     dot += a[i] * b[i];
   }
   return dot;
+}
+
+/** L2-normalize a vector in place and return it. */
+function l2Normalize(v: Float32Array): Float32Array {
+  let norm = 0;
+  for (let i = 0; i < v.length; i++) norm += v[i] * v[i];
+  norm = Math.sqrt(norm);
+  if (norm > 0) {
+    for (let i = 0; i < v.length; i++) v[i] /= norm;
+  }
+  return v;
+}
+
+/** Normalize text for deduplication: lowercase + collapse whitespace. */
+function normalizeTasteText(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Simple djb2 hash for cache key construction. */
+function djb2Hash(s: string): string {
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+async function computeTasteProfile(): Promise<TasteProfileResponse> {
+  if (!model || !tokenizer) {
+    return {
+      state: "error",
+      message: "Model not loaded",
+      probes: [],
+      labelCount: 0,
+      timestamp: Date.now(),
+      cacheKey: "",
+    };
+  }
+
+  // 1. Read and dedupe labels
+  const labels = await readLabels();
+  const seen = new Set<string>();
+  const positives: string[] = [];
+  const negatives: string[] = [];
+
+  for (const l of labels) {
+    const norm = normalizeTasteText(l.text);
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    if (l.label === "positive") positives.push(l.text);
+    else negatives.push(l.text);
+  }
+
+  if (positives.length < TASTE_MIN_LABELS) {
+    const need = TASTE_MIN_LABELS - positives.length;
+    return {
+      state: "insufficient_labels",
+      message: `Label ${need} more item${need === 1 ? "" : "s"} to see your taste profile.`,
+      probes: [],
+      labelCount: positives.length,
+      timestamp: Date.now(),
+      cacheKey: "",
+    };
+  }
+
+  // 2. Embed positive labels in batches, L2-normalize each
+  const posEmbeddings: Float32Array[] = [];
+  for (let i = 0; i < positives.length; i += SCORE_BATCH_SIZE) {
+    const batch = positives.slice(i, i + SCORE_BATCH_SIZE);
+    const embs = await embed(batch);
+    for (const e of embs) posEmbeddings.push(l2Normalize(e));
+  }
+
+  // 3. Compute positive centroid
+  const dim = posEmbeddings[0].length;
+  const posCentroid = new Float32Array(dim);
+  for (const emb of posEmbeddings) {
+    for (let j = 0; j < dim; j++) posCentroid[j] += emb[j];
+  }
+  for (let j = 0; j < dim; j++) posCentroid[j] /= posEmbeddings.length;
+
+  // 4. Contrastive: subtract scaled negative centroid if enough negatives
+  const tasteVec = new Float32Array(posCentroid);
+  if (negatives.length >= TASTE_MIN_NEGATIVES) {
+    const negEmbeddings: Float32Array[] = [];
+    for (let i = 0; i < negatives.length; i += SCORE_BATCH_SIZE) {
+      const batch = negatives.slice(i, i + SCORE_BATCH_SIZE);
+      const embs = await embed(batch);
+      for (const e of embs) negEmbeddings.push(l2Normalize(e));
+    }
+    const negCentroid = new Float32Array(dim);
+    for (const emb of negEmbeddings) {
+      for (let j = 0; j < dim; j++) negCentroid[j] += emb[j];
+    }
+    for (let j = 0; j < dim; j++) negCentroid[j] /= negEmbeddings.length;
+
+    // tasteVec = posCentroid - alpha * negCentroid
+    for (let j = 0; j < dim; j++) {
+      tasteVec[j] -= TASTE_NEG_ALPHA * negCentroid[j];
+    }
+  }
+
+  // 5. L2-normalize the taste vector
+  l2Normalize(tasteVec);
+
+  // 6. Gather probes for active categories only
+  const activeIds = new Set(Object.keys(currentCategoryMap ?? {}));
+  const probeEntries: { probe: string; category: string }[] = [];
+  for (const [catId, phrases] of Object.entries(TASTE_PROBES)) {
+    if (!activeIds.has(catId)) continue;
+    for (const phrase of phrases) {
+      probeEntries.push({ probe: phrase, category: catId });
+    }
+  }
+
+  // 7. Embed probes in batches, L2-normalize each
+  const probeTexts = probeEntries.map((p) => p.probe);
+  const probeEmbeddings: Float32Array[] = [];
+  for (let i = 0; i < probeTexts.length; i += SCORE_BATCH_SIZE) {
+    const batch = probeTexts.slice(i, i + SCORE_BATCH_SIZE);
+    const embs = await embed(batch);
+    for (const e of embs) probeEmbeddings.push(l2Normalize(e));
+  }
+
+  // 8. Score each probe against taste vector
+  const scored: TasteProbeResult[] = probeEntries.map((entry, i) => ({
+    probe: entry.probe,
+    score: cosineSimilarity(probeEmbeddings[i], tasteVec),
+    category: entry.category,
+  }));
+
+  // 9. Sort and apply diversity cap (max N per category)
+  scored.sort((a, b) => b.score - a.score);
+  const catCount: Record<string, number> = {};
+  const diverseTop: TasteProbeResult[] = [];
+  for (const s of scored) {
+    const count = catCount[s.category] ?? 0;
+    if (count >= TASTE_MAX_PER_CATEGORY) continue;
+    catCount[s.category] = count + 1;
+    diverseTop.push(s);
+    if (diverseTop.length >= TASTE_TOP_K) break;
+  }
+
+  // 10. Build composite cache key
+  const modelIdStore = await chrome.storage.local.get([
+    STORAGE_KEYS.CUSTOM_MODEL_ID,
+    STORAGE_KEYS.CUSTOM_MODEL_URL,
+  ]);
+  const modelKey = modelIdStore[STORAGE_KEYS.CUSTOM_MODEL_URL]
+    || modelIdStore[STORAGE_KEYS.CUSTOM_MODEL_ID]
+    || "default";
+  const sortedPos = [...positives].sort().join("|");
+  const sortedNeg = [...negatives].sort().join("|");
+  const sortedCats = [...activeIds].sort().join(",");
+  const cacheKey = djb2Hash(
+    `${sortedPos}\0${sortedNeg}\0${sortedCats}\0${modelKey}\0${PROBES_VERSION}`,
+  );
+
+  // 11. Cache and return
+  const response: TasteProfileResponse = {
+    state: "ready",
+    probes: diverseTop,
+    labelCount: positives.length,
+    timestamp: Date.now(),
+    cacheKey,
+  };
+  await chrome.storage.local.set({ [STORAGE_KEYS.TASTE_PROFILE]: response });
+  return response;
 }
 
 function mapScoreToVibe(text: string, score: number) {
@@ -951,6 +1128,20 @@ chrome.runtime.onMessage.addListener(
       case MSG.PAGE_SCORE_UPDATED: {
         // Ignore — we are the source
         break;
+      }
+
+      case MSG.COMPUTE_TASTE_PROFILE: {
+        computeTasteProfile()
+          .then((result) => sendResponse(result))
+          .catch((err) => sendResponse({
+            state: "error",
+            message: String(err),
+            probes: [],
+            labelCount: 0,
+            timestamp: Date.now(),
+            cacheKey: "",
+          } as TasteProfileResponse));
+        return true;
       }
 
       case MSG.MODEL_STATUS: {
