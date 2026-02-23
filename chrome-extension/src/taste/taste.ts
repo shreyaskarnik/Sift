@@ -3,8 +3,10 @@
  * Reads cached TasteProfileResponse from storage and renders full-width bars.
  * Can trigger a recompute via background message.
  */
-import { MSG, STORAGE_KEYS } from "../shared/constants";
-import type { TasteProfileResponse, CategoryMap } from "../shared/types";
+import { MSG, STORAGE_KEYS, DEFAULT_ACTIVE_IDS } from "../shared/constants";
+import { scoreToHue } from "../shared/scoring-utils";
+import { PROBES_VERSION } from "../shared/taste-probes";
+import type { TasteProfileResponse, TrainingLabel, CategoryMap } from "../shared/types";
 
 const empty = document.getElementById("empty") as HTMLDivElement;
 const results = document.getElementById("results") as HTMLDivElement;
@@ -15,12 +17,6 @@ const refreshBtn = document.getElementById("refresh") as HTMLButtonElement;
 const computing = document.getElementById("computing") as HTMLDivElement;
 
 let categoryMap: CategoryMap = {};
-
-/** Two-zone hue matching popup scoring-utils. */
-function scoreToHue(score: number): number {
-  if (score < 0.5) return 220 + 10 * (score / 0.5);
-  return 50 - 25 * ((score - 0.5) / 0.5);
-}
 
 function render(data: TasteProfileResponse): void {
   refreshBtn.style.display = "";
@@ -112,17 +108,61 @@ async function refresh(): Promise<void> {
   }
 }
 
+function djb2Hash(s: string): string {
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+async function computeCacheKey(labels: TrainingLabel[]): Promise<string> {
+  const sorted = [...labels].sort((a, b) => b.timestamp - a.timestamp);
+  const seen = new Set<string>();
+  const positives: string[] = [];
+  const negatives: string[] = [];
+  for (const l of sorted) {
+    const norm = l.text.toLowerCase().replace(/\s+/g, " ").trim();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    if (l.label === "positive") positives.push(l.text);
+    else negatives.push(l.text);
+  }
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
+    STORAGE_KEYS.CUSTOM_MODEL_ID,
+    STORAGE_KEYS.CUSTOM_MODEL_URL,
+  ]);
+  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? [...DEFAULT_ACTIVE_IDS]).sort().join(",");
+  const modelKey = stored[STORAGE_KEYS.CUSTOM_MODEL_URL]
+    || stored[STORAGE_KEYS.CUSTOM_MODEL_ID]
+    || "default";
+  return djb2Hash(`${[...positives].sort().join("|")}\0${[...negatives].sort().join("|")}\0${catIds}\0${modelKey}\0${PROBES_VERSION}`);
+}
+
 async function init(): Promise<void> {
   // Load category map for display names
   const catStore = await chrome.storage.local.get(STORAGE_KEYS.CATEGORY_MAP);
   categoryMap = (catStore[STORAGE_KEYS.CATEGORY_MAP] as CategoryMap) ?? {};
 
-  // Load cached profile
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
+  // Load cached profile + labels for staleness check
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEYS.TASTE_PROFILE,
+    STORAGE_KEYS.LABELS,
+  ]);
   const cached = stored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
+  const labels = (stored[STORAGE_KEYS.LABELS] as TrainingLabel[]) ?? [];
 
   if (cached && cached.probes && cached.probes.length > 0) {
+    const currentKey = await computeCacheKey(labels);
+    const isStale = currentKey !== cached.cacheKey;
+
     render(cached);
+
+    if (isStale) {
+      subtitle.textContent = "Profile is outdated — click Refresh to update";
+      void refresh();
+    }
   } else {
     empty.textContent = "No cached taste profile. Click Refresh to compute.";
     refreshBtn.style.display = "";

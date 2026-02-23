@@ -460,12 +460,26 @@ function renderTasteProfile(data: TasteProfileResponse): void {
   tasteBadge.textContent = `${data.probes.length}`;
 }
 
+let tasteIsStale = false;
+
 async function loadCachedTasteProfile(): Promise<void> {
   try {
-    const stored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
+    const stored = await chrome.storage.local.get([
+      STORAGE_KEYS.TASTE_PROFILE,
+      STORAGE_KEYS.LABELS,
+    ]);
     const cached = stored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
-    if (cached && cached.state === "ready" && cached.probes.length > 0) {
-      renderTasteProfile(cached);
+    if (!cached || cached.state !== "ready" || !cached.probes.length) return;
+
+    // Check staleness before rendering
+    const labels = (stored[STORAGE_KEYS.LABELS] as TrainingLabel[]) ?? [];
+    const currentKey = await computeTasteCacheKey(labels);
+    tasteIsStale = currentKey !== cached.cacheKey;
+
+    renderTasteProfile(cached);
+
+    if (tasteIsStale) {
+      tasteBadge.textContent = "stale";
     }
   } catch { /* no cached profile */ }
 }
@@ -562,11 +576,14 @@ async function init() {
     chrome.tabs.create({ url: chrome.runtime.getURL("taste.html") });
   });
 
-  // Auto-compute on first fold open if no cached data
+  // Auto-compute on first fold open if no cached data or stale
   const tasteFold = document.querySelector(".fold-taste") as HTMLDetailsElement;
   tasteFold.addEventListener("toggle", () => {
-    if (tasteFold.open && tasteBars.children.length === 0 && tasteComputing.style.display === "none") {
-      void refreshTasteProfile();
+    if (tasteFold.open && tasteComputing.style.display === "none") {
+      if (tasteBars.children.length === 0 || tasteIsStale) {
+        tasteIsStale = false;
+        void refreshTasteProfile();
+      }
     }
   });
 }
@@ -609,18 +626,6 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
     lastLabels = labels;
     const stats = summarizeLabels(labels);
     lastLabelStats = stats;
-
-    // Taste profile staleness — compare composite cache keys
-    try {
-      const tasteStored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
-      const cachedTaste = tasteStored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
-      if (cachedTaste?.cacheKey) {
-        const currentKey = await computeTasteCacheKey(labels);
-        if (currentKey !== cachedTaste.cacheKey) {
-          tasteBadge.textContent = "stale";
-        }
-      }
-    } catch { /* non-critical */ }
 
     // Update fold badge
     labelCountBadge.textContent = stats.total > 0 ? `${stats.total}` : "";
