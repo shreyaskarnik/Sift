@@ -995,3 +995,99 @@ footer p {
   opacity: 0.5;
   line-height: 1.3;
 }
+
+/* ── Taste Profile ── */
+.fold-taste .fold-content {
+  padding-top: 10px;
+}
+
+.taste-empty,
+.taste-computing {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.taste-computing {
+  animation: taste-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes taste-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.taste-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taste-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.taste-bar-label {
+  flex: 0 0 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 10px;
+}
+
+.taste-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.taste-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.taste-bar-score {
+  flex: 0 0 30px;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.taste-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.taste-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.btn-sm {
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-sm:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+}
