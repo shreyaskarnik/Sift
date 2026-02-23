@@ -16,6 +16,7 @@ await build({ configFile: resolve(__dirname, "vite.config.ts") });
 // 2. Popup + content scripts as self-contained IIFEs
 const iifeEntries = [
   { name: "popup", entry: resolve(__dirname, "src/popup/popup.ts") },
+  { name: "taste", entry: resolve(__dirname, "src/taste/taste.ts") },
   { name: "hn-content", entry: resolve(__dirname, "src/content/hn/hn-content.ts") },
   { name: "reddit-content", entry: resolve(__dirname, "src/content/reddit/reddit-content.ts") },
   { name: "x-content", entry: resolve(__dirname, "src/content/x/x-content.ts") },

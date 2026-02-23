@@ -366,8 +366,9 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     };
   }
 
-  // 1. Read and dedupe labels
+  // 1. Read and dedupe labels (newest first so latest label wins contradictions)
   const labels = await readLabels();
+  labels.sort((a, b) => b.timestamp - a.timestamp);
   const seen = new Set<string>();
   const positives: string[] = [];
   const negatives: string[] = [];
@@ -437,8 +438,11 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
   }
   l2Normalize(tasteVec);
 
-  // 6. Gather probes for active categories only
-  const activeIds = new Set(Object.keys(currentCategoryMap ?? {}));
+  // 6. Gather probes for active categories only (read from storage, not currentCategoryMap which includes archived)
+  const catStore = await chrome.storage.local.get([STORAGE_KEYS.ACTIVE_CATEGORY_IDS]);
+  const activeIds = new Set<string>(
+    (catStore[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined) ?? [...DEFAULT_ACTIVE_IDS],
+  );
   const probeEntries: { probe: string; category: string }[] = [];
   for (const [catId, phrases] of Object.entries(TASTE_PROBES)) {
     if (!activeIds.has(catId)) continue;

@@ -70,6 +70,7 @@ const tasteMeta = document.getElementById("taste-meta") as HTMLSpanElement;
 const tasteRefresh = document.getElementById("taste-refresh") as HTMLButtonElement;
 const tasteBadge = document.getElementById("taste-badge") as HTMLSpanElement;
 const tasteComputing = document.getElementById("taste-computing") as HTMLDivElement;
+const tasteFullLink = document.getElementById("taste-full-link") as HTMLAnchorElement;
 
 interface LabelStats {
   total: number;
@@ -361,10 +362,11 @@ function djb2Hash(s: string): string {
 
 /** Compute the expected cache key from current label + category + model state. */
 async function computeTasteCacheKey(labels: TrainingLabel[]): Promise<string> {
+  const sorted = [...labels].sort((a, b) => b.timestamp - a.timestamp);
   const seen = new Set<string>();
   const positives: string[] = [];
   const negatives: string[] = [];
-  for (const l of labels) {
+  for (const l of sorted) {
     const norm = l.text.toLowerCase().replace(/\s+/g, " ").trim();
     if (seen.has(norm)) continue;
     seen.add(norm);
@@ -379,7 +381,7 @@ async function computeTasteCacheKey(labels: TrainingLabel[]): Promise<string> {
     STORAGE_KEYS.CUSTOM_MODEL_ID,
     STORAGE_KEYS.CUSTOM_MODEL_URL,
   ]);
-  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? []).sort().join(",");
+  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? [...DEFAULT_ACTIVE_IDS]).sort().join(",");
   const modelKey = stored[STORAGE_KEYS.CUSTOM_MODEL_URL]
     || stored[STORAGE_KEYS.CUSTOM_MODEL_ID]
     || "default";
@@ -388,11 +390,15 @@ async function computeTasteCacheKey(labels: TrainingLabel[]): Promise<string> {
 }
 
 function renderTasteProfile(data: TasteProfileResponse): void {
+  // Show refresh button in all terminal states (not during loading)
+  tasteRefresh.style.display = "";
+
   if (data.state === "insufficient_labels" || data.state === "error") {
     tasteEmpty.textContent = data.message || "Unable to compute taste profile.";
     tasteEmpty.style.display = "";
     tasteResults.style.display = "none";
     tasteComputing.style.display = "none";
+    tasteMeta.textContent = "";
     tasteBadge.textContent = "";
     return;
   }
@@ -402,6 +408,7 @@ function renderTasteProfile(data: TasteProfileResponse): void {
     tasteEmpty.style.display = "";
     tasteResults.style.display = "none";
     tasteComputing.style.display = "none";
+    tasteMeta.textContent = "";
     tasteBadge.textContent = "";
     return;
   }
@@ -410,29 +417,29 @@ function renderTasteProfile(data: TasteProfileResponse): void {
   tasteComputing.style.display = "none";
   tasteResults.style.display = "";
 
-  // Find score range for relative bar widths
-  const maxScore = data.probes[0].score;
-  const minScore = data.probes[data.probes.length - 1].score;
-  const range = maxScore - minScore || 1;
+  // Show top 5 in popup; full list available on taste.html
+  const POPUP_TOP_K = 5;
+  const preview = data.probes.slice(0, POPUP_TOP_K);
 
   tasteBars.replaceChildren();
 
-  for (const p of data.probes) {
+  for (const p of preview) {
     const row = document.createElement("div");
     row.className = "taste-bar-row";
 
     const label = document.createElement("span");
     label.className = "taste-bar-label";
-    label.textContent = p.probe;
-    label.title = `${categoryMap[p.category]?.label ?? p.category}: ${p.probe}`;
+    const probeText = p.probe.charAt(0).toUpperCase() + p.probe.slice(1);
+    label.textContent = probeText;
+    label.title = `${categoryMap[p.category]?.label ?? p.category}: ${probeText}`;
 
     const track = document.createElement("div");
     track.className = "taste-bar-track";
 
     const fill = document.createElement("div");
     fill.className = "taste-bar-fill";
-    const pct = Math.max(8, ((p.score - minScore) / range) * 100);
-    fill.style.width = `${pct}%`;
+    // Absolute width: score is 0–1 cosine similarity
+    fill.style.width = `${Math.max(2, p.score * 100)}%`;
     const hue = Math.round(scoreToHue(Math.max(0, Math.min(1, p.score))));
     fill.style.background = `hsl(${hue}, 65%, 55%)`;
 
@@ -445,6 +452,9 @@ function renderTasteProfile(data: TasteProfileResponse): void {
     row.append(label, track, score);
     tasteBars.appendChild(row);
   }
+
+  // Show "See full profile" link only when there are more probes than shown
+  tasteFullLink.style.display = data.probes.length > POPUP_TOP_K ? "" : "none";
 
   tasteMeta.textContent = `Based on ${data.labelCount} labels`;
   tasteBadge.textContent = `${data.probes.length}`;
@@ -464,6 +474,7 @@ async function refreshTasteProfile(): Promise<void> {
   tasteEmpty.style.display = "none";
   tasteResults.style.display = "none";
   tasteComputing.style.display = "";
+  tasteRefresh.style.display = "none";
   tasteRefresh.disabled = true;
 
   try {
@@ -475,6 +486,7 @@ async function refreshTasteProfile(): Promise<void> {
     tasteComputing.style.display = "none";
     tasteEmpty.style.display = "";
     tasteEmpty.textContent = "Failed to compute taste profile.";
+    tasteRefresh.style.display = "";
   } finally {
     tasteRefresh.disabled = false;
   }
@@ -543,6 +555,11 @@ async function init() {
 
   tasteRefresh.addEventListener("click", () => {
     void refreshTasteProfile();
+  });
+
+  tasteFullLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL("taste.html") });
   });
 
   // Auto-compute on first fold open if no cached data

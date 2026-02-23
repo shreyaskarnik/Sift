@@ -1033,7 +1033,7 @@ footer p {
 }
 
 .taste-bar-label {
-  flex: 0 0 180px;
+  flex: 0 0 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1060,6 +1060,21 @@ footer p {
   text-align: right;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.taste-full-link {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-decoration: none;
+  text-align: right;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.taste-full-link:hover {
+  color: var(--accent);
 }
 
 .taste-footer {
