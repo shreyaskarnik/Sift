@@ -1,33 +1,4 @@
-# LinkedIn Announcement Post
-
-## Option A: Concise & Punchy
-
-**I built a Chrome extension that runs a 300M-parameter AI model entirely in your browser to filter your feeds.**
-
-No server. No login. No data leaves your device.
-
-Sift uses EmbeddingGemma (quantized to ~50MB) via Transformers.js to score every item on Hacker News, Reddit, and X against your interests in real-time. Low-relevance items fade out. High-relevance items stay bright.
-
-But the part I'm most excited about: a closed-loop training pipeline.
-
-1. Browse normally and thumbs-up/down items you care about
-2. Export your labels as CSV triplets
-3. Fine-tune the model with a single Python script (or a free Colab notebook)
-4. Load your personalized model back into the extension
-
-The model literally learns *your* taste — not an average user's taste. And it does it with contrastive learning (MultipleNegativesRankingLoss), so it gets better at separating what you want from what you don't.
-
-There's also a "Taste Profile" that shows your sub-topic preferences across ~100 probe phrases per category. It's like a mirror for your information diet.
-
-Stack: TypeScript, Chrome MV3, Transformers.js (WebGPU/WASM), sentence-transformers, ONNX quantization.
-
-Open source: [link]
-
-#AI #ChromeExtension #MachineLearning #Privacy #OpenSource
-
----
-
-## Option B: Storytelling Angle
+# LinkedIn Announcement Post (Option B — Storytelling)
 
 **Every morning I'd open Hacker News, Reddit, and X — and spend 20 minutes scrolling past things I don't care about to find the 3 things I do.**
 
@@ -51,9 +22,80 @@ And a Taste Profile that reveals your sub-topic preferences: "You prefer open-so
 
 Everything runs client-side. Your labels, your model, your data — all yours.
 
+Built with @Hugging Face Transformers.js, @Google EmbeddingGemma, and @Google Chrome Extensions MV3.
+
 [link to repo]
 
 #BuildInPublic #AI #Privacy #ChromeExtension #OpenSource
+
+### Companies to tag on LinkedIn:
+- **Hugging Face** — Transformers.js runtime + model hosting (HF Hub)
+- **Google** — EmbeddingGemma model + Chrome platform + Colab notebooks
+- **Google Chrome** — Chrome Extensions / MV3 platform
+- **ONNX Runtime / Microsoft** — ONNX model format + quantization tooling
+- **Y Combinator / Hacker News** — one of the three supported feeds
+- **Reddit** — one of the three supported feeds
+- **X (Twitter)** — one of the three supported feeds
+
+---
+
+# X (Twitter) Post
+
+## Standard Post (280 characters)
+
+I built a Chrome extension that runs a 300M-param AI model in your browser to filter HN, Reddit, and X feeds.
+
+No server. No data leaves your device.
+
+Label items → fine-tune → reload. It learns YOUR taste.
+
+Open source: [link]
+
+## Thread Version (for more reach)
+
+**Tweet 1 (hook):**
+I built a Chrome extension that runs a 300M-parameter embedding model entirely in your browser to filter your feeds.
+
+No server. No login. Your data never leaves your device.
+
+It's called Sift. Here's how it works:
+
+**Tweet 2 (how it works):**
+When you load Hacker News, Reddit, or X — Sift scores every item against your interest categories using EmbeddingGemma (quantized to ~50MB).
+
+Low-relevance items fade out. High-relevance items stay bright.
+
+25 built-in categories: AI Research, Startups, Climate, Politics, etc.
+
+**Tweet 3 (the training loop):**
+But the real magic is the training loop:
+
+1. Thumbs up/down items as you browse
+2. Export labels as CSV triplets
+3. Fine-tune with one Python script (or free Colab notebook)
+4. Load your personalized model back in
+
+~50 labels and one training run — the model starts reflecting YOU.
+
+**Tweet 4 (taste profile):**
+There's also a Taste Profile that reveals your sub-topic preferences:
+
+"You prefer open-source ML frameworks over enterprise SaaS"
+"You engage more with climate policy than climate science"
+
+Like a mirror for your information diet.
+
+**Tweet 5 (CTA):**
+Stack: TypeScript, Chrome MV3, @huaboringface Transformers.js, @Google EmbeddingGemma, ONNX quantization
+
+Everything is open source: [link]
+
+### Companies/accounts to tag on X:
+- **@huggingface** — Transformers.js, model hub
+- **@Google** — EmbeddingGemma model
+- **@GoogleChrome** — Chrome Extensions platform
+- **@onnxruntime** — ONNX model format
+- **@GoogleColab** — training notebook environment
 
 ---
 
