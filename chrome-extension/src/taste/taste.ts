@@ -3,9 +3,9 @@
  * Reads cached TasteProfileResponse from storage and renders full-width bars.
  * Can trigger a recompute via background message.
  */
-import { MSG, STORAGE_KEYS, DEFAULT_ACTIVE_IDS } from "../shared/constants";
+import { MSG, STORAGE_KEYS } from "../shared/constants";
 import { scoreToHue } from "../shared/scoring-utils";
-import { PROBES_VERSION } from "../shared/taste-probes";
+import { computeTasteCacheKey } from "../shared/taste-cache-key";
 import type { TasteProfileResponse, TrainingLabel, CategoryMap } from "../shared/types";
 
 const empty = document.getElementById("empty") as HTMLDivElement;
@@ -108,38 +108,6 @@ async function refresh(): Promise<void> {
   }
 }
 
-function djb2Hash(s: string): string {
-  let hash = 5381;
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(36);
-}
-
-async function computeCacheKey(labels: TrainingLabel[]): Promise<string> {
-  const sorted = [...labels].sort((a, b) => b.timestamp - a.timestamp);
-  const seen = new Set<string>();
-  const positives: string[] = [];
-  const negatives: string[] = [];
-  for (const l of sorted) {
-    const norm = l.text.toLowerCase().replace(/\s+/g, " ").trim();
-    if (seen.has(norm)) continue;
-    seen.add(norm);
-    if (l.label === "positive") positives.push(l.text);
-    else negatives.push(l.text);
-  }
-  const stored = await chrome.storage.local.get([
-    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
-    STORAGE_KEYS.CUSTOM_MODEL_ID,
-    STORAGE_KEYS.CUSTOM_MODEL_URL,
-  ]);
-  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? [...DEFAULT_ACTIVE_IDS]).sort().join(",");
-  const modelKey = stored[STORAGE_KEYS.CUSTOM_MODEL_URL]
-    || stored[STORAGE_KEYS.CUSTOM_MODEL_ID]
-    || "default";
-  return djb2Hash(`${[...positives].sort().join("|")}\0${[...negatives].sort().join("|")}\0${catIds}\0${modelKey}\0${PROBES_VERSION}`);
-}
-
 async function init(): Promise<void> {
   // Load category map for display names
   const catStore = await chrome.storage.local.get(STORAGE_KEYS.CATEGORY_MAP);
@@ -154,7 +122,7 @@ async function init(): Promise<void> {
   const labels = (stored[STORAGE_KEYS.LABELS] as TrainingLabel[]) ?? [];
 
   if (cached && cached.probes && cached.probes.length > 0) {
-    const currentKey = await computeCacheKey(labels);
+    const currentKey = await computeTasteCacheKey(labels);
     const isStale = currentKey !== cached.cacheKey;
 
     render(cached);

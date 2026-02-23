@@ -3,7 +3,7 @@ import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
 import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking, CategoryMap, TasteProfileResponse } from "../shared/types";
-import { PROBES_VERSION } from "../shared/taste-probes";
+import { computeTasteCacheKey } from "../shared/taste-cache-key";
 
 // ---------------------------------------------------------------------------
 // CategoryMap — loaded from storage, refreshed on change
@@ -351,43 +351,6 @@ async function toggleCategory(id: string): Promise<void> {
 // Taste profile helpers
 // ---------------------------------------------------------------------------
 
-/** djb2 hash for lightweight cache key comparison. */
-function djb2Hash(s: string): string {
-  let hash = 5381;
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(36);
-}
-
-/** Compute the expected cache key from current label + category + model state. */
-async function computeTasteCacheKey(labels: TrainingLabel[]): Promise<string> {
-  const sorted = [...labels].sort((a, b) => b.timestamp - a.timestamp);
-  const seen = new Set<string>();
-  const positives: string[] = [];
-  const negatives: string[] = [];
-  for (const l of sorted) {
-    const norm = l.text.toLowerCase().replace(/\s+/g, " ").trim();
-    if (seen.has(norm)) continue;
-    seen.add(norm);
-    if (l.label === "positive") positives.push(l.text);
-    else negatives.push(l.text);
-  }
-  const sortedPos = [...positives].sort().join("|");
-  const sortedNeg = [...negatives].sort().join("|");
-
-  const stored = await chrome.storage.local.get([
-    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
-    STORAGE_KEYS.CUSTOM_MODEL_ID,
-    STORAGE_KEYS.CUSTOM_MODEL_URL,
-  ]);
-  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? [...DEFAULT_ACTIVE_IDS]).sort().join(",");
-  const modelKey = stored[STORAGE_KEYS.CUSTOM_MODEL_URL]
-    || stored[STORAGE_KEYS.CUSTOM_MODEL_ID]
-    || "default";
-
-  return djb2Hash(`${sortedPos}\0${sortedNeg}\0${catIds}\0${modelKey}\0${PROBES_VERSION}`);
-}
 
 function renderTasteProfile(data: TasteProfileResponse): void {
   // Show refresh button in all terminal states (not during loading)
@@ -626,6 +589,18 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
     lastLabels = labels;
     const stats = summarizeLabels(labels);
     lastLabelStats = stats;
+
+    // Taste profile staleness — compare composite cache keys
+    try {
+      const tasteStored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
+      const cachedTaste = tasteStored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
+      if (cachedTaste?.cacheKey) {
+        const currentKey = await computeTasteCacheKey(labels);
+        const stale = currentKey !== cachedTaste.cacheKey;
+        tasteIsStale = stale;
+        if (stale) tasteBadge.textContent = "stale";
+      }
+    } catch { /* non-critical */ }
 
     // Update fold badge
     labelCountBadge.textContent = stats.total > 0 ? `${stats.total}` : "";

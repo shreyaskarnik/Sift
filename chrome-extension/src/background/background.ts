@@ -54,7 +54,8 @@ import type {
   TasteProfileResponse,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
-import { TASTE_PROBES, PROBES_VERSION } from "../shared/taste-probes";
+import { TASTE_PROBES } from "../shared/taste-probes";
+import { computeTasteCacheKeyFromParts } from "../shared/taste-cache-key";
 import { migrateLabels } from "./migrations";
 
 // ---------------------------------------------------------------------------
@@ -346,14 +347,6 @@ function normalizeTasteText(s: string): string {
 }
 
 /** Simple djb2 hash for cache key construction. */
-function djb2Hash(s: string): string {
-  let hash = 5381;
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(36);
-}
-
 async function computeTasteProfile(): Promise<TasteProfileResponse> {
   if (!model || !tokenizer) {
     return {
@@ -487,12 +480,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
   const modelKey = modelIdStore[STORAGE_KEYS.CUSTOM_MODEL_URL]
     || modelIdStore[STORAGE_KEYS.CUSTOM_MODEL_ID]
     || "default";
-  const sortedPos = [...positives].sort().join("|");
-  const sortedNeg = [...negatives].sort().join("|");
-  const sortedCats = [...activeIds].sort().join(",");
-  const cacheKey = djb2Hash(
-    `${sortedPos}\0${sortedNeg}\0${sortedCats}\0${modelKey}\0${PROBES_VERSION}`,
-  );
+  const cacheKey = computeTasteCacheKeyFromParts(positives, negatives, activeIds, modelKey);
 
   // 11. Cache and return
   const response: TasteProfileResponse = {
