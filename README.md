@@ -26,12 +26,13 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 
 ## How It Works
 
-1. **Category selection** — You pick a scoring category like "News" or "AI Research" (25 built-in, custom coming soon)
+1. **Category selection** — Pick scoring categories like "AI Research" or "Open Source" (25 built-in, custom coming soon)
 2. **Embedding** — Every title/tweet gets embedded by EmbeddingGemma running in your browser (WebGPU/WASM)
-3. **Scoring** — Cosine similarity against the category's anchor embedding produces a 0–1 score
-4. **Category detection** — Each item is also compared against all active categories; top matches appear as pills in the popup and feed inspector
+3. **Scoring** — Cosine similarity against category anchor embeddings produces a 0–1 score
+4. **Category detection** — Each item is compared against all active categories; top matches appear as pills in the feed inspector
 5. **Dimming** — Low scores fade out, high scores stay bright. Sensitivity is adjustable
-6. **Training** — Thumbs up/down on items exports as per-category CSV triplets for fine-tuning
+6. **Taste profile** — After labeling 10+ items, Sift builds a contrastive taste profile showing your top interests ranked by affinity
+7. **Training** — Thumbs up/down on items exports as per-category CSV triplets for fine-tuning
 
 ## Extension
 
@@ -47,6 +48,7 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - Per-site toggles and sensitivity slider
 - 25 built-in categories across tech, world, and lifestyle groups (user-defined categories coming soon)
 - **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
+- **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; top-5 preview in popup, full-page view with category chips and ranked bars
 - Thumbs up/down training labels with per-anchor CSV export
 - X archive import (like.js, bookmark.js)
 - Light/dark mode (follows system)
@@ -130,7 +132,8 @@ Popup ──────────chrome.runtime.sendMessage──────
 
 - **Background** — Loads EmbeddingGemma via Transformers.js, manages scoring + deterministic inspector rationale, routes messages, stores labels
 - **Content scripts** — Site-specific DOM selectors, MutationObserver for infinite scroll, debounced scoring
-- **Popup** — Settings, category toggles, sensitivity slider, data export
+- **Popup** — Settings, category toggles, sensitivity slider, taste profile preview, data export
+- **Taste page** — Full-width taste profile viewer (`taste.html`), reads cached profile from storage
 
 ## Project Structure
 
@@ -147,7 +150,8 @@ Popup ──────────chrome.runtime.sendMessage──────
         ├── content/            # HN, Reddit, X content scripts
         │   └── common/         # Shared: batch scorer, styles, widget, labels
         ├── popup/              # Popup UI
-        ├── shared/             # Constants, types
+        ├── taste/              # Full-page taste profile viewer
+        ├── shared/             # Constants, types, taste probes, cache-key utils
         └── storage/            # CSV export, X archive parser
 ```
 
