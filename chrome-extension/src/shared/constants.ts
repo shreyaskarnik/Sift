@@ -99,6 +99,9 @@ export const MSG = {
 
   // Category management
   CATEGORIES_CHANGED: "CATEGORIES_CHANGED",
+
+  // Taste profile
+  COMPUTE_TASTE_PROFILE: "COMPUTE_TASTE_PROFILE",
 } as const;
 
 /** Storage keys for chrome.storage.local */
@@ -116,6 +119,7 @@ export const STORAGE_KEYS = {
   CATEGORY_MAP: "category_map",
   CATEGORIES_VERSION: "categories_version",
   TOP_K_PILLS: "top_k_pills",
+  TASTE_PROFILE: "taste_profile",
 } as const;
 
 /** Default number of category pills shown per scored item */
@@ -129,6 +133,21 @@ export const ANCHOR_MIN_SCORE = 0.15;
 
 /** Batch size for content script scoring requests */
 export const SCORE_BATCH_SIZE = 16;
+
+/** Minimum positive labels required to compute a taste profile */
+export const TASTE_MIN_LABELS = 10;
+
+/** Number of top probes to return in taste profile results */
+export const TASTE_TOP_K = 15;
+
+/** Max probes from any single category in the final top-K (diversity cap) */
+export const TASTE_MAX_PER_CATEGORY = 3;
+
+/** Negative centroid scaling factor for contrastive taste vector */
+export const TASTE_NEG_ALPHA = 0.3;
+
+/** Minimum negative labels to include contrastive signal */
+export const TASTE_MIN_NEGATIVES = 3;
 
 /** Bump when TrainingLabel schema changes. Background runs migration on mismatch. */
 export const LABEL_SCHEMA_VERSION = 3;

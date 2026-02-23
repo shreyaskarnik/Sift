@@ -127,3 +127,20 @@ export interface PageScoreResponse {
 export interface PageScoreUpdatedPayload extends PageScoreResponse {
   tabId: number;
 }
+
+/** A single probe result in the taste profile */
+export interface TasteProbeResult {
+  probe: string;
+  score: number;
+  category: string;
+}
+
+/** Response from COMPUTE_TASTE_PROFILE */
+export interface TasteProfileResponse {
+  state: "ready" | "insufficient_labels" | "error";
+  message?: string;
+  probes: TasteProbeResult[];
+  labelCount: number;
+  timestamp: number;
+  cacheKey: string;
+}
