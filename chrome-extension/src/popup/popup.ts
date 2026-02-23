@@ -1,8 +1,9 @@
-import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_MIN_SCORE, BUILTIN_CATEGORIES, DEFAULT_ACTIVE_IDS, DEFAULT_TOP_K_PILLS } from "../shared/constants";
+import { MSG, STORAGE_KEYS, DEFAULT_QUERY_ANCHOR, ANCHOR_MIN_SCORE, BUILTIN_CATEGORIES, DEFAULT_ACTIVE_IDS, DEFAULT_TOP_K_PILLS, TASTE_MIN_LABELS } from "../shared/constants";
 import { scoreToHue, getScoreBand } from "../shared/scoring-utils";
 import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
-import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking, CategoryMap } from "../shared/types";
+import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking, CategoryMap, TasteProfileResponse } from "../shared/types";
+import { PROBES_VERSION } from "../shared/taste-probes";
 
 // ---------------------------------------------------------------------------
 // CategoryMap — loaded from storage, refreshed on change
@@ -62,6 +63,13 @@ const pageScoreExplain = document.getElementById("page-score-explain")!;
 const labelCountBadge = document.getElementById("label-count-badge")!;
 const categoryGrid = document.getElementById("category-grid")!;
 const categoryCountBadge = document.getElementById("category-count-badge")!;
+const tasteEmpty = document.getElementById("taste-empty") as HTMLDivElement;
+const tasteResults = document.getElementById("taste-results") as HTMLDivElement;
+const tasteBars = document.getElementById("taste-bars") as HTMLDivElement;
+const tasteMeta = document.getElementById("taste-meta") as HTMLSpanElement;
+const tasteRefresh = document.getElementById("taste-refresh") as HTMLButtonElement;
+const tasteBadge = document.getElementById("taste-badge") as HTMLSpanElement;
+const tasteComputing = document.getElementById("taste-computing") as HTMLDivElement;
 
 interface LabelStats {
   total: number;
@@ -338,6 +346,140 @@ async function toggleCategory(id: string): Promise<void> {
   buildCategoryGrid();
 }
 
+// ---------------------------------------------------------------------------
+// Taste profile helpers
+// ---------------------------------------------------------------------------
+
+/** djb2 hash for lightweight cache key comparison. */
+function djb2Hash(s: string): string {
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Compute the expected cache key from current label + category + model state. */
+async function computeTasteCacheKey(labels: TrainingLabel[]): Promise<string> {
+  const seen = new Set<string>();
+  const positives: string[] = [];
+  const negatives: string[] = [];
+  for (const l of labels) {
+    const norm = l.text.toLowerCase().replace(/\s+/g, " ").trim();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    if (l.label === "positive") positives.push(l.text);
+    else negatives.push(l.text);
+  }
+  const sortedPos = [...positives].sort().join("|");
+  const sortedNeg = [...negatives].sort().join("|");
+
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEYS.ACTIVE_CATEGORY_IDS,
+    STORAGE_KEYS.CUSTOM_MODEL_ID,
+    STORAGE_KEYS.CUSTOM_MODEL_URL,
+  ]);
+  const catIds = ((stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[]) ?? []).sort().join(",");
+  const modelKey = stored[STORAGE_KEYS.CUSTOM_MODEL_URL]
+    || stored[STORAGE_KEYS.CUSTOM_MODEL_ID]
+    || "default";
+
+  return djb2Hash(`${sortedPos}\0${sortedNeg}\0${catIds}\0${modelKey}\0${PROBES_VERSION}`);
+}
+
+function renderTasteProfile(data: TasteProfileResponse): void {
+  if (data.state === "insufficient_labels" || data.state === "error") {
+    tasteEmpty.textContent = data.message || "Unable to compute taste profile.";
+    tasteEmpty.style.display = "";
+    tasteResults.style.display = "none";
+    tasteComputing.style.display = "none";
+    tasteBadge.textContent = "";
+    return;
+  }
+
+  if (!data.probes || data.probes.length === 0) {
+    tasteEmpty.textContent = "No taste profile available.";
+    tasteEmpty.style.display = "";
+    tasteResults.style.display = "none";
+    tasteComputing.style.display = "none";
+    tasteBadge.textContent = "";
+    return;
+  }
+
+  tasteEmpty.style.display = "none";
+  tasteComputing.style.display = "none";
+  tasteResults.style.display = "";
+
+  // Find score range for relative bar widths
+  const maxScore = data.probes[0].score;
+  const minScore = data.probes[data.probes.length - 1].score;
+  const range = maxScore - minScore || 1;
+
+  tasteBars.replaceChildren();
+
+  for (const p of data.probes) {
+    const row = document.createElement("div");
+    row.className = "taste-bar-row";
+
+    const label = document.createElement("span");
+    label.className = "taste-bar-label";
+    label.textContent = p.probe;
+    label.title = `${categoryMap[p.category]?.label ?? p.category}: ${p.probe}`;
+
+    const track = document.createElement("div");
+    track.className = "taste-bar-track";
+
+    const fill = document.createElement("div");
+    fill.className = "taste-bar-fill";
+    const pct = Math.max(8, ((p.score - minScore) / range) * 100);
+    fill.style.width = `${pct}%`;
+    const hue = Math.round(scoreToHue(Math.max(0, Math.min(1, p.score))));
+    fill.style.background = `hsl(${hue}, 65%, 55%)`;
+
+    track.appendChild(fill);
+
+    const score = document.createElement("span");
+    score.className = "taste-bar-score";
+    score.textContent = p.score.toFixed(2);
+
+    row.append(label, track, score);
+    tasteBars.appendChild(row);
+  }
+
+  tasteMeta.textContent = `Based on ${data.labelCount} labels`;
+  tasteBadge.textContent = `${data.probes.length}`;
+}
+
+async function loadCachedTasteProfile(): Promise<void> {
+  try {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
+    const cached = stored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
+    if (cached && cached.state === "ready" && cached.probes.length > 0) {
+      renderTasteProfile(cached);
+    }
+  } catch { /* no cached profile */ }
+}
+
+async function refreshTasteProfile(): Promise<void> {
+  tasteEmpty.style.display = "none";
+  tasteResults.style.display = "none";
+  tasteComputing.style.display = "";
+  tasteRefresh.disabled = true;
+
+  try {
+    const response: TasteProfileResponse = await chrome.runtime.sendMessage({
+      type: MSG.COMPUTE_TASTE_PROFILE,
+    });
+    renderTasteProfile(response);
+  } catch {
+    tasteComputing.style.display = "none";
+    tasteEmpty.style.display = "";
+    tasteEmpty.textContent = "Failed to compute taste profile.";
+  } finally {
+    tasteRefresh.disabled = false;
+  }
+}
+
 // --- Initialize ---
 async function init() {
   // Load saved settings
@@ -395,6 +537,21 @@ async function init() {
 
   // Load page score for current tab
   await loadPageScore();
+
+  // Taste profile — load cached on open, refresh on click
+  void loadCachedTasteProfile();
+
+  tasteRefresh.addEventListener("click", () => {
+    void refreshTasteProfile();
+  });
+
+  // Auto-compute on first fold open if no cached data
+  const tasteFold = document.querySelector(".fold-taste") as HTMLDetailsElement;
+  tasteFold.addEventListener("toggle", () => {
+    if (tasteFold.open && tasteBars.children.length === 0 && tasteComputing.style.display === "none") {
+      void refreshTasteProfile();
+    }
+  });
 }
 
 function updateModelStatus(status: ModelStatus) {
@@ -435,6 +592,18 @@ async function refreshLabelCounts(): Promise<TrainingLabel[]> {
     lastLabels = labels;
     const stats = summarizeLabels(labels);
     lastLabelStats = stats;
+
+    // Taste profile staleness — compare composite cache keys
+    try {
+      const tasteStored = await chrome.storage.local.get(STORAGE_KEYS.TASTE_PROFILE);
+      const cachedTaste = tasteStored[STORAGE_KEYS.TASTE_PROFILE] as TasteProfileResponse | undefined;
+      if (cachedTaste?.cacheKey) {
+        const currentKey = await computeTasteCacheKey(labels);
+        if (currentKey !== cachedTaste.cacheKey) {
+          tasteBadge.textContent = "stale";
+        }
+      }
+    } catch { /* non-critical */ }
 
     // Update fold badge
     labelCountBadge.textContent = stats.total > 0 ? `${stats.total}` : "";
