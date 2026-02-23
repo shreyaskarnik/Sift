@@ -137,7 +137,7 @@ export interface TasteProbeResult {
 
 /** Response from COMPUTE_TASTE_PROFILE */
 export interface TasteProfileResponse {
-  state: "ready" | "insufficient_labels" | "error";
+  state: "loading" | "ready" | "insufficient_labels" | "error";
   message?: string;
   probes: TasteProbeResult[];
   labelCount: number;

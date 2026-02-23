@@ -429,7 +429,12 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     }
   }
 
-  // 5. L2-normalize the taste vector
+  // 5. L2-normalize the taste vector; fallback to posCentroid if contrastive subtraction collapsed it
+  let norm = 0;
+  for (let j = 0; j < dim; j++) norm += tasteVec[j] * tasteVec[j];
+  if (Math.sqrt(norm) < 1e-6) {
+    tasteVec.set(posCentroid);
+  }
   l2Normalize(tasteVec);
 
   // 6. Gather probes for active categories only
