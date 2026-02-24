@@ -21,6 +21,11 @@ chrome-extension/dist/
 .DS_Store
 Thumbs.db
 
+# Video generation
+video-frames/
+video-output/
+.video-chrome-profile/
+
 # Env / secrets
 .env
 .env.local
