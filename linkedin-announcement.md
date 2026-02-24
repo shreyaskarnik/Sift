@@ -10,6 +10,7 @@ When you load a feed, Sift scores every item against 25 interest categories — 
 
 The "aha" moment for me was the training loop. You can:
 - Label items with thumbs up/down as you browse
+- Curate your labels in a full Label Manager — inline edit text, flip polarity, reassign categories, add labels manually by pasting a URL (it auto-fetches the title and suggests the best category)
 - Export those labels as training triplets
 - Fine-tune the model on your personal preferences (one click in a free Colab notebook, or locally)
 - Load the fine-tuned model back into the extension — with full WebGPU acceleration
@@ -73,9 +74,8 @@ Low-relevance items fade out. High-relevance items stay bright.
 But the real magic is the training loop:
 
 1. Thumbs up/down items as you browse
-2. Export labels as CSV triplets
-3. Fine-tune with one Colab notebook (free T4 GPU) or locally
-4. Load your personalized model back in — full WebGPU acceleration
+2. Curate in the Label Manager — edit, filter, add labels by URL
+3. Export → fine-tune on free Colab T4 → reload with WebGPU
 
 ~50 labels and one training run — the model starts reflecting YOU.
 
@@ -116,10 +116,11 @@ Show the end-to-end workflow:
 2. **Browse HN** — watch items get scored, show the opacity dimming
 3. **Press "?"** — show the inspector explaining *why* an item scored the way it did
 4. **Thumbs up/down** — label 5-10 items live
-5. **Export CSV** — show the triplet format
-6. **Run training** — Colab notebook or terminal, show the Taste Check metrics (before→after)
-7. **Reload model** — paste custom model URL, show scores improve with WebGPU
-8. **Taste Profile** — open the full-page viewer, scroll through ranked probes
+5. **Label Manager** — open it, show filters, inline edit a label, add one by URL
+6. **Export CSV** — show the triplet format
+7. **Run training** — Colab notebook or terminal, show the Taste Check metrics (before→after)
+8. **Reload model** — paste custom model URL, show scores improve with WebGPU
+9. **Taste Profile** — open the full-page viewer, scroll through ranked probes
 
 ## 3. "Privacy Proof" Demo (60 seconds)
 - Open Chrome DevTools Network tab
@@ -142,14 +143,22 @@ Quick cuts between:
 - Highlight surprising or specific sub-topic preferences
 - "I didn't know I cared more about distributed systems than frontend frameworks until Sift showed me."
 
-## 6. "Agent Mode: Your Personal HN" (30–45 seconds, good for a teaser clip)
+## 6. "Label Manager: Curate Your Training Data" (45–60 seconds)
+- Open Label Manager from the popup
+- Show the filterable table — filter by category, polarity, source
+- Click a label's text to inline edit it
+- Click the category pill to reassign to a different category
+- Paste a URL into "Add label", watch it auto-fetch the title and suggest a category
+- "You're not just labeling — you're curating the dataset that teaches your model what matters to you."
+
+## 7. "Agent Mode: Your Personal HN" (30–45 seconds, good for a teaser clip)
 - Open the agent page
 - Press "Fetch my stories"
 - Watch the top 30 HN stories populate, ranked by taste score
 - Each story has a category pill showing why it matched
 - "Instead of scrolling through 500 HN posts, I get my top 30 in one click."
 
-## 7. Screen Recording Tips
+## 8. Screen Recording Tips
 - Use a clean browser profile with just Sift installed
 - Pre-load some labeled data so the Taste Profile is populated
 - Record at 1080p or higher, crop to the browser window
