@@ -1,7 +1,6 @@
 <div align="center">
 
-![Sift logo](chrome-extension/public/icons/logo-light.svg#gh-light-mode-only)
-![Sift logo](chrome-extension/public/icons/logo-dark.svg#gh-dark-mode-only)
+![Sift logo](docs/assets/logo.png)
 
 </div>
 
@@ -22,7 +21,7 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 
 <div align="center">
 
-![Sift infographic: local scoring, supported sites, and training loop](docs/assets/sift-infographic.svg)
+![Sift infographic: local scoring, supported sites, and training loop](docs/assets/sift-infographic.png)
 
 </div>
 
