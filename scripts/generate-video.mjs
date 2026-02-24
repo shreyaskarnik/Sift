@@ -3,13 +3,13 @@
  * generate-video.mjs — Create a Sift demo video from title cards + screenshots.
  *
  * Title cards are rendered as HTML via Playwright. Site demos use pre-captured
- * screenshots from video-screenshots/. Compiles everything into MP4 + WebM.
+ * screenshots from docs/assets/video-screenshots/. Compiles everything into MP4 + WebM.
  *
  * Usage:
  *   node scripts/generate-video.mjs [options]
  *
  * Options:
- *   --out <path>        Output video path (default: video-output/sift-demo.webm)
+ *   --out <path>        Output video path (default: docs/assets/video-output/sift-demo.webm)
  *   --fps <n>           Frames per second (default: 1 — each frame = 1 second)
  *   --width <n>         Viewport width (default: 1280)
  *   --height <n>        Viewport height (default: 800)
@@ -17,7 +17,7 @@
  *   --title-hold <sec>  Seconds to hold title cards (default: 4)
  *   --scale <n>         Device scale factor (default: 2 for retina)
  *
- * Screenshots directory: video-screenshots/
+ * Screenshots directory: docs/assets/video-screenshots/
  *   Place your pre-captured PNGs there. The script resizes and centers them
  *   on a dark background to match video dimensions.
  *
@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const FRAMES_DIR = join(ROOT, "video-frames");
-const SCREENSHOTS_DIR = join(ROOT, "video-screenshots");
+const SCREENSHOTS_DIR = join(ROOT, "docs", "assets", "video-screenshots");
 
 // Find ffmpeg: prefer system install, fall back to Playwright-bundled
 function findFfmpeg() {
@@ -91,7 +91,7 @@ function getArg(name, fallback) {
   const idx = args.indexOf(`--${name}`);
   return idx >= 0 && args[idx + 1] ? args[idx + 1] : fallback;
 }
-const OUT = getArg("out", join(ROOT, "video-output", "sift-demo.webm"));
+const OUT = getArg("out", join(ROOT, "docs", "assets", "video-output", "sift-demo.webm"));
 const FPS = Number(getArg("fps", "2"));
 const WIDTH = Number(getArg("width", "1280"));
 const HEIGHT = Number(getArg("height", "800"));
@@ -319,8 +319,8 @@ function screenshotPageHTML(imagePath, annotation) {
 /**
  * Scene types:
  * - "title"      → Render an HTML title card
- * - "screenshot" → Display a pre-captured screenshot from video-screenshots/
- * - "html"       → Render an HTML file from video-screenshots/ (e.g. diagrams)
+ * - "screenshot" → Display a pre-captured screenshot from docs/assets/video-screenshots/
+ * - "html"       → Render an HTML file from docs/assets/video-screenshots/ (e.g. diagrams)
  */
 function buildScenes() {
   const ss = (file) => join(SCREENSHOTS_DIR, file);
@@ -528,7 +528,7 @@ async function main() {
   if (missingScreenshots.length > 0) {
     console.log(`\n⚠ Missing ${missingScreenshots.length} screenshot(s):`);
     for (const f of missingScreenshots) {
-      console.log(`   - video-screenshots/${f}`);
+      console.log(`   - docs/assets/video-screenshots/${f}`);
     }
     console.log("   Missing screenshots will be skipped.\n");
   }
