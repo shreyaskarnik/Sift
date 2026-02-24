@@ -101,6 +101,31 @@ export interface SetLabelsPayload {
   labels: TrainingLabel[];
 }
 
+/** Payload for UPDATE_LABEL — identifies label by text+timestamp composite key */
+export interface UpdateLabelPayload {
+  /** Original text for matching */
+  matchText: string;
+  /** Original timestamp for matching */
+  matchTimestamp: number;
+  /** Fields to update (partial) */
+  updates: {
+    text?: string;
+    label?: "positive" | "negative";
+    anchor?: string;
+  };
+}
+
+/** Payload for DELETE_LABEL — identifies label by text+timestamp composite key */
+export interface DeleteLabelPayload {
+  matchText: string;
+  matchTimestamp: number;
+}
+
+/** Payload for FETCH_PAGE_TITLE */
+export interface FetchPageTitlePayload {
+  url: string;
+}
+
 /** Payload for EXPLAIN_SCORE */
 export interface ExplainScorePayload {
   text: string;
@@ -128,6 +153,26 @@ export interface PageScoreUpdatedPayload extends PageScoreResponse {
   tabId: number;
 }
 
+/** Per-category label statistics for taste UI */
+export interface CategoryLabelStats {
+  pos: number;
+  neg: number;
+  lastTimestamp: number;
+}
+
+/** Aggregated category score (from radar chart computation) */
+export interface AggregatedCategory {
+  id: string;
+  label: string;
+  score: number;
+}
+
+/** Return value from renderRadarChart */
+export interface RadarRenderResult {
+  rendered: boolean;
+  categories: AggregatedCategory[];
+}
+
 /** A single probe result in the taste profile */
 export interface TasteProbeResult {
   probe: string;
@@ -144,4 +189,25 @@ export interface TasteProfileResponse {
   labelCount: number;
   timestamp: number;
   cacheKey: string;
+}
+
+/** A single HN story scored by the agent */
+export interface AgentStory {
+  id: number;
+  title: string;
+  url: string;
+  domain: string;
+  hnScore: number;
+  by: string;
+  time: number;
+  descendants: number;
+  tasteScore: number;
+  topCategory?: string;
+}
+
+/** Response from AGENT_FETCH_HN */
+export interface AgentFetchHNResponse {
+  stories: AgentStory[];
+  elapsed: number;
+  error?: string;
 }

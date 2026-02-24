@@ -73,9 +73,10 @@ def convert_to_onnx(model_dir: Path, output_dir: Path, quantize: bool = True) ->
       output_dir/
         config.json, tokenizer.json, tokenizer_config.json, special_tokens_map.json
         onnx/
-          model.onnx           (fp32)
-          model_quantized.onnx  (int8)
-          model_q4.onnx         (4-bit block-quantized)
+          model.onnx                (fp32)
+          model_quantized.onnx      (int8)
+          model_q4.onnx             (4-bit block-quantized, WASM)
+          model_no_gather_q4.onnx   (4-bit, WebGPU-compatible)
     """
     import logging
     import shutil
@@ -163,6 +164,19 @@ def convert_to_onnx(model_dir: Path, output_dir: Path, quantize: bool = True) ->
             q4_path = onnx_subdir / "model_q4.onnx"
             onnx.save(quant.model.model, str(q4_path))
             print(f"Q4 model: {q4_path.stat().st_size / (1024*1024):.1f} MB")
+
+            # WebGPU-compatible variant: strip GatherElements ops if present
+            no_gather_path = onnx_subdir / "model_no_gather_q4.onnx"
+            q4_model = onnx.load(str(q4_path))
+            gather_nodes = [n for n in q4_model.graph.node if n.op_type == "GatherElements"]
+            if not gather_nodes:
+                shutil.copy2(str(q4_path), str(no_gather_path))
+                print(f"Q4 no_gather (WebGPU): copied (no GatherElements ops found)")
+            else:
+                for node in gather_nodes:
+                    node.op_type = "Gather"
+                onnx.save(q4_model, str(no_gather_path))
+                print(f"Q4 no_gather (WebGPU): replaced {len(gather_nodes)} GatherElements → Gather")
         except Exception as e:
             print(f"Q4 quantization failed (non-critical): {e}")
 
@@ -245,6 +259,8 @@ def main():
                         help="Print semantic search rankings after training (debug)")
     parser.add_argument("--device", type=str, default=None,
                         help="Force device: cpu, mps, cuda (default: auto-detect)")
+    parser.add_argument("--hf-token", type=str, default=None,
+                        help="HuggingFace token (required for gated models, or set HF_TOKEN env var)")
     args = parser.parse_args()
 
     if args.epochs <= 0:
@@ -296,9 +312,10 @@ def main():
         )
         sys.exit(1)
 
+    hf_token = args.hf_token or AppConfig.HF_TOKEN
     device = args.device or ("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Loading base model: {AppConfig.MODEL_NAME} (device: {device})")
-    model = SentenceTransformer(AppConfig.MODEL_NAME, device=device)
+    model = SentenceTransformer(AppConfig.MODEL_NAME, device=device, token=hf_token)
     print(f"Model loaded on {model.device}")
 
     output_dir = Path(args.output) if args.output else AppConfig.ARTIFACTS_DIR / "sift-finetuned"
@@ -330,9 +347,9 @@ def main():
     convert_to_onnx(output_dir, onnx_output, quantize=not args.no_quantize)
 
     if args.push_to_hub:
-        token = AppConfig.HF_TOKEN
+        token = hf_token
         if not token:
-            print("Set HF_TOKEN to push to Hub")
+            print("Set HF_TOKEN env var or pass --hf-token to push to Hub")
             sys.exit(1)
         result = upload_model_to_hub(output_dir, args.push_to_hub, token)
         print(result)

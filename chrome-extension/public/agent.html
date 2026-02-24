@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent — Sift</title>
+  <style>
+    /* ── Light (default) ── */
+    :root {
+      --bg: #ffffff;
+      --surface: #f4f5f7;
+      --surface-2: #ebedf0;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-hover: rgba(0, 0, 0, 0.15);
+      --text: #1a1c20;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #059669;
+      --radius: 8px;
+      --radius-sm: 5px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e0f11;
+        --surface: #181a1e;
+        --surface-2: #1e2025;
+        --border: rgba(255, 255, 255, 0.06);
+        --border-hover: rgba(255, 255, 255, 0.12);
+        --text: #e4e5e7;
+        --text-muted: #7a7d85;
+        --text-dim: #4e5058;
+        --accent: #34d399;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Verdana, Geneva, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px 0;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* ── Header Bar ── */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .header-bar h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .header-bar .subtitle {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .btn-fetch {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--accent);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn-fetch:hover {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+
+    .btn-fetch:disabled { opacity: 0.5; cursor: default; }
+
+    /* ── Status ── */
+    .status {
+      font-size: 10px;
+      color: var(--text-dim);
+      padding: 0 16px;
+      margin-bottom: 4px;
+      min-height: 14px;
+    }
+
+    /* ── Empty State ── */
+    .empty-state {
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 48px 16px;
+      text-align: center;
+    }
+
+    /* ── Story List (HN-like) ── */
+    .story-list {
+      padding: 0 4px;
+    }
+
+    /* Title row: rank + title + domain */
+    .story-athing {
+      display: flex;
+      align-items: baseline;
+      padding: 2px 0 0;
+    }
+
+    .story-rank {
+      flex: 0 0 30px;
+      text-align: right;
+      padding-right: 6px;
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+
+    .story-titleline {
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+
+    .story-titleline a {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .story-titleline a:visited {
+      color: var(--text-muted);
+    }
+
+    .story-titleline a:hover {
+      text-decoration: underline;
+    }
+
+    .story-domain {
+      font-size: 9.5px;
+      color: var(--text-dim);
+      margin-left: 5px;
+    }
+
+    .story-category {
+      font-size: 8.5px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0 6px;
+      margin-left: 6px;
+      vertical-align: 1px;
+      white-space: nowrap;
+    }
+
+    /* Subtext row: points, author, time, comments | taste score */
+    .story-subtext {
+      display: flex;
+      align-items: baseline;
+      padding: 1px 0 5px;
+      margin-left: 36px;
+      font-size: 9.5px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .story-subtext a {
+      color: var(--text-dim);
+      text-decoration: none;
+    }
+
+    .story-subtext a:hover {
+      text-decoration: underline;
+    }
+
+    .story-subline {
+      flex: 1;
+    }
+
+    .story-taste {
+      flex: 0 0 auto;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      padding-left: 12px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div>
+      <h1>Sift Agent</h1>
+      <div class="subtitle">Your personalized HN feed</div>
+    </div>
+    <button class="btn-fetch" id="fetch-btn">Fetch my feed</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="empty" class="empty-state"></div>
+  <div id="story-list" class="story-list"></div>
+
+  <script src="agent.js"></script>
+</body>
+</html>

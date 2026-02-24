@@ -213,6 +213,30 @@ body {
   font-size: 0;
 }
 
+/* ── Agent Button ── */
+
+.agent-btn {
+  display: block;
+  text-align: center;
+  padding: 7px 0;
+  margin-bottom: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.agent-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* ── Folds ── */
 
 .fold {
@@ -1018,63 +1042,90 @@ footer p {
   50% { opacity: 1; }
 }
 
-.taste-bars {
+/* ── Popup radar ── */
+.taste-radar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  justify-content: center;
+  margin: 4px 0;
 }
 
-.taste-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
+.taste-radar svg {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+}
+
+.radar-grid {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.radar-axis {
+  stroke: var(--border);
+  stroke-width: 0.5;
+}
+
+.radar-polygon {
+  fill: rgba(52, 211, 153, 0.15);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.radar-dot {
+  fill: var(--accent);
+}
+
+.radar-label {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  fill: var(--text);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.radar-score-label {
+  font-size: 9px;
   font-family: "JetBrains Mono", monospace;
+  fill: var(--text-dim);
+  text-anchor: end;
 }
 
-.taste-bar-label {
-  flex: 0 0 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-  font-size: 10px;
-}
-
-.taste-bar-track {
-  flex: 1;
-  height: 6px;
-  background: var(--surface-2);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.taste-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.taste-bar-score {
-  flex: 0 0 30px;
-  text-align: right;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+.radar-hit-area {
+  fill: transparent;
 }
 
 .taste-full-link {
   display: block;
-  margin-top: 6px;
-  font-size: 10px;
-  color: var(--text-dim);
+  margin-top: 4px;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--accent);
   text-decoration: none;
-  text-align: right;
+  text-align: center;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: opacity 0.15s;
 }
 
 .taste-full-link:hover {
+  opacity: 0.75;
+}
+
+.labels-full-link {
+  display: block;
+  margin: 4px 0 8px;
+  font-size: 11px;
   color: var(--accent);
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.labels-full-link:hover {
+  opacity: 0.75;
 }
 
 .taste-footer {

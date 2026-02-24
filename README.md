@@ -50,7 +50,9 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - 25 built-in categories across tech, world, and lifestyle groups (user-defined categories coming soon)
 - **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
 - **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; top-5 preview in popup, full-page view with category chips and ranked bars
+- **Interactive radar chart** — SVG spider chart of your taste across all categories; click any axis to drill into that category's sub-topic probes
 - Thumbs up/down training labels with per-anchor CSV export
+- **Label Manager** — full-page view to filter, inline-edit, reassign categories, and add labels by URL (auto-fetches title + suggests best category)
 - X archive import (like.js, bookmark.js)
 - Light/dark mode (follows system)
 - Custom model URL for testing local fine-tuned models
@@ -83,9 +85,15 @@ For private/development models, use the local server instead (`python train.py -
 
 Fine-tune EmbeddingGemma on your collected labels, export to ONNX, and quantize for browser inference.
 
+### Prerequisites
+
+EmbeddingGemma is a gated model — you need to:
+1. **Accept the license** at https://huggingface.co/google/embeddinggemma-300m
+2. **Create an HF token** (read access) at https://huggingface.co/settings/tokens
+
 ### Colab (recommended if you don't have a GPU)
 
-Open `train_colab.ipynb` in Google Colab with a T4 GPU runtime. Upload your CSV, run all cells, download the ONNX zip.
+Open `train_colab.ipynb` in Google Colab with a T4 GPU runtime. Paste your HF token in the Configuration cell, upload your CSV, run all cells, download the ONNX zip.
 
 ### Install
 
@@ -96,13 +104,16 @@ uv pip install ".[quantize]"
 ### Usage
 
 ```bash
-# Fine-tune on exported CSV
+# Fine-tune on exported CSV (uses HF_TOKEN env var)
 python train.py path/to/sift_training.csv
+
+# Or pass token explicitly
+python train.py data.csv --hf-token hf_xxx
 
 # With custom hyperparams
 python train.py data.csv --epochs 6 --lr 3e-5
 
-# Convert existing model to ONNX (fp32 + int8 + q4)
+# Convert existing model to ONNX (fp32 + int8 + q4 + q4 no_gather)
 python train.py --convert-only path/to/saved_model
 
 # Serve locally for testing in extension
@@ -151,7 +162,9 @@ Popup ──────────chrome.runtime.sendMessage──────
         ├── content/            # HN, Reddit, X content scripts
         │   └── common/         # Shared: batch scorer, styles, widget, labels
         ├── popup/              # Popup UI
+        ├── labels/             # Label Manager (full-page label editor)
         ├── taste/              # Full-page taste profile viewer
+        ├── agent/              # Agent mode: taste-ranked HN feed (experimental)
         ├── shared/             # Constants, types, taste probes, cache-key utils
         └── storage/            # CSV export, X archive parser
 ```
