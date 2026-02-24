@@ -22,7 +22,7 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 
 ## Demo
 
-<https://github.com/user-attachments/assets/a958732b-cb5e-457d-b1a6-8423c55ecb9a>
+https://github.com/user-attachments/assets/83430c6b-b7fa-41c0-a163-ebc76874dd25
 
 ## At a Glance
 
