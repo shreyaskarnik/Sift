@@ -11,14 +11,16 @@ When you load a feed, Sift scores every item against 25 interest categories — 
 The "aha" moment for me was the training loop. You can:
 - Label items with thumbs up/down as you browse
 - Export those labels as training triplets
-- Fine-tune the model on your personal preferences (locally or on Colab)
-- Load the fine-tuned model back into the extension
+- Fine-tune the model on your personal preferences (one click in a free Colab notebook, or locally)
+- Load the fine-tuned model back into the extension — with full WebGPU acceleration
 
 After ~50 labels and one training run, the difference is striking. The model stops being generic and starts reflecting *you*.
 
 There's also an inspector (press "?" on any item) that explains scores deterministically — no LLM call, no cost, instant.
 
 And a Taste Profile that reveals your sub-topic preferences: "You prefer open-source ML frameworks over enterprise SaaS" or "You engage more with climate policy than climate science."
+
+I'm also prototyping an agent mode — press a button, and Sift fetches the top 30 Hacker News stories ranked by your personal taste vector. No scrolling required. Your own relevance-ranked front page, powered by a model that knows what you care about.
 
 Everything runs client-side. Your labels, your model, your data — all yours.
 
@@ -47,7 +49,7 @@ I built a Chrome extension that runs a 300M-param AI model in your browser to fi
 
 No server. No data leaves your device.
 
-Label items → fine-tune → reload. It learns YOUR taste.
+Label items → fine-tune on free Colab → reload with WebGPU. It learns YOUR taste.
 
 Open source: [link]
 
@@ -72,21 +74,22 @@ But the real magic is the training loop:
 
 1. Thumbs up/down items as you browse
 2. Export labels as CSV triplets
-3. Fine-tune with one Python script (or free Colab notebook)
-4. Load your personalized model back in
+3. Fine-tune with one Colab notebook (free T4 GPU) or locally
+4. Load your personalized model back in — full WebGPU acceleration
 
 ~50 labels and one training run — the model starts reflecting YOU.
 
-**Tweet 4 (taste profile):**
-There's also a Taste Profile that reveals your sub-topic preferences:
+**Tweet 4 (taste profile + agent mode):**
+There's a Taste Profile that reveals your sub-topic preferences:
 
 "You prefer open-source ML frameworks over enterprise SaaS"
-"You engage more with climate policy than climate science"
 
-Like a mirror for your information diet.
+And an experimental agent mode — press a button, get the top 30 HN stories ranked by YOUR taste vector. Your own relevance-ranked front page.
 
 **Tweet 5 (CTA):**
-Stack: TypeScript, Chrome MV3, @huaboringface Transformers.js, @Google EmbeddingGemma, ONNX quantization
+Stack: TypeScript, Chrome MV3, @huggingface Transformers.js, @Google EmbeddingGemma, ONNX quantization, WebGPU
+
+Training pipeline: Python + Colab notebook included
 
 Everything is open source: [link]
 
@@ -114,8 +117,8 @@ Show the end-to-end workflow:
 3. **Press "?"** — show the inspector explaining *why* an item scored the way it did
 4. **Thumbs up/down** — label 5-10 items live
 5. **Export CSV** — show the triplet format
-6. **Run training** — terminal or Colab, show the loss curve and Taste Check metrics
-7. **Reload model** — paste custom model URL, show scores improve
+6. **Run training** — Colab notebook or terminal, show the Taste Check metrics (before→after)
+7. **Reload model** — paste custom model URL, show scores improve with WebGPU
 8. **Taste Profile** — open the full-page viewer, scroll through ranked probes
 
 ## 3. "Privacy Proof" Demo (60 seconds)
@@ -139,7 +142,14 @@ Quick cuts between:
 - Highlight surprising or specific sub-topic preferences
 - "I didn't know I cared more about distributed systems than frontend frameworks until Sift showed me."
 
-## 6. Screen Recording Tips
+## 6. "Agent Mode: Your Personal HN" (30–45 seconds, good for a teaser clip)
+- Open the agent page
+- Press "Fetch my stories"
+- Watch the top 30 HN stories populate, ranked by taste score
+- Each story has a category pill showing why it matched
+- "Instead of scrolling through 500 HN posts, I get my top 30 in one click."
+
+## 7. Screen Recording Tips
 - Use a clean browser profile with just Sift installed
 - Pre-load some labeled data so the Taste Profile is populated
 - Record at 1080p or higher, crop to the browser window
