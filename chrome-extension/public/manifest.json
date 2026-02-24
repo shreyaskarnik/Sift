@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Sift through the noise. Score your feed with EmbeddingGemma, right in the browser.",
   "permissions": ["activeTab", "tabs", "storage", "unlimitedStorage"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
