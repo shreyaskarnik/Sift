@@ -161,6 +161,204 @@
       cursor: default;
     }
 
+    /* ── Radar chart ── */
+    .radar-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 28px;
+      position: relative;
+    }
+
+    .radar-container svg {
+      width: 100%;
+      max-width: 420px;
+      height: auto;
+    }
+
+    .radar-grid {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+
+    .radar-axis {
+      stroke: var(--border);
+      stroke-width: 0.5;
+      transition: opacity 0.2s;
+    }
+
+    .radar-polygon {
+      fill: rgba(52, 211, 153, 0.15);
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+
+    .radar-dot {
+      fill: var(--accent);
+      transition: opacity 0.2s;
+    }
+
+    .radar-label {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      fill: var(--text);
+      text-anchor: middle;
+      dominant-baseline: central;
+      cursor: pointer;
+      transition: fill 0.2s, opacity 0.2s;
+    }
+
+    .radar-label--active {
+      fill: var(--accent);
+    }
+
+    .radar-label--dimmed {
+      opacity: 0.3;
+    }
+
+    .radar-axis--dimmed {
+      opacity: 0.15;
+    }
+
+    .radar-dot--dimmed {
+      opacity: 0.2;
+    }
+
+    .radar-hit-area {
+      fill: transparent;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .radar-hit-area:focus-visible {
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-dasharray: 4 2;
+    }
+
+    .radar-score-label {
+      font-size: 8px;
+      font-family: "JetBrains Mono", monospace;
+      fill: var(--text-dim);
+      text-anchor: end;
+    }
+
+    /* ── Radar toggle ── */
+    .radar-toggle {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .radar-toggle .btn-sm {
+      font-size: 11px;
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .radar-toggle .btn-sm:hover {
+      background: var(--surface-2);
+      border-color: var(--border-hover);
+    }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+    }
+
+    .filter-bar.visible {
+      display: flex;
+    }
+
+    .filter-bar-label {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .filter-bar-cta {
+      color: var(--text-muted);
+      font-size: 11px;
+      flex: 1;
+    }
+
+    .filter-bar .btn-sm {
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .filter-bar .btn-sm:hover {
+      background: var(--border);
+      border-color: var(--border-hover);
+    }
+
+    /* ── Radar tooltip ── */
+    .radar-tooltip {
+      position: absolute;
+      z-index: 10;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      pointer-events: none;
+      animation: tooltip-in 0.12s ease-out;
+      white-space: nowrap;
+    }
+
+    .radar-tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .radar-tooltip-key {
+      color: var(--text-muted);
+    }
+
+    .radar-tooltip-val {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10px;
+      color: var(--text);
+    }
+
+    @keyframes tooltip-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      letter-spacing: 0.03em;
+    }
+
     .empty-state {
       font-size: 13px;
       color: var(--text-dim);
@@ -188,6 +386,16 @@
 
   <div id="empty" class="empty-state">Loading...</div>
   <div id="results" style="display:none">
+    <div id="radar" class="radar-container"></div>
+    <div id="radar-toggle" class="radar-toggle" style="display:none">
+      <button class="btn-sm" id="radar-toggle-btn">Show all categories</button>
+    </div>
+    <div id="filter-bar" class="filter-bar">
+      <span class="filter-bar-label" id="filter-bar-label"></span>
+      <span class="filter-bar-cta" id="filter-bar-cta"></span>
+      <button class="btn-sm" id="filter-bar-reset">Show all</button>
+    </div>
+    <div id="probe-header" class="section-label" style="display:none">Probe Detail</div>
     <div id="bars" class="taste-bars"></div>
   </div>
   <div id="computing" class="computing" style="display:none">Computing taste profile...</div>

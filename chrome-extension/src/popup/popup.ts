@@ -4,6 +4,7 @@ import { exportToCSV, countExportableTriplets } from "../storage/csv-export";
 import { parseXArchiveFiles } from "../storage/x-archive-parser";
 import type { TrainingLabel, ModelStatus, PageScoreResponse, PageScoreUpdatedPayload, PresetRanking, CategoryMap, TasteProfileResponse } from "../shared/types";
 import { computeTasteCacheKey } from "../shared/taste-cache-key";
+import { renderRadarChart } from "../shared/radar";
 
 // ---------------------------------------------------------------------------
 // CategoryMap — loaded from storage, refreshed on change
@@ -65,12 +66,13 @@ const categoryGrid = document.getElementById("category-grid")!;
 const categoryCountBadge = document.getElementById("category-count-badge")!;
 const tasteEmpty = document.getElementById("taste-empty") as HTMLDivElement;
 const tasteResults = document.getElementById("taste-results") as HTMLDivElement;
-const tasteBars = document.getElementById("taste-bars") as HTMLDivElement;
+const tasteRadar = document.getElementById("taste-radar") as HTMLDivElement;
 const tasteMeta = document.getElementById("taste-meta") as HTMLSpanElement;
 const tasteRefresh = document.getElementById("taste-refresh") as HTMLButtonElement;
 const tasteBadge = document.getElementById("taste-badge") as HTMLSpanElement;
 const tasteComputing = document.getElementById("taste-computing") as HTMLDivElement;
 const tasteFullLink = document.getElementById("taste-full-link") as HTMLAnchorElement;
+const labelsFullLink = document.getElementById("labels-full-link") as HTMLAnchorElement;
 
 interface LabelStats {
   total: number;
@@ -380,45 +382,15 @@ function renderTasteProfile(data: TasteProfileResponse): void {
   tasteComputing.style.display = "none";
   tasteResults.style.display = "";
 
-  // Show top 5 in popup; full list available on taste.html
-  const POPUP_TOP_K = 5;
-  const preview = data.probes.slice(0, POPUP_TOP_K);
+  // Compact radar chart — all categories at a glance
+  const { rendered: radarShown } = renderRadarChart(tasteRadar, data.probes, categoryMap, {
+    size: 320,
+    radius: 105,
+    showScaleLabels: false,
+  });
+  tasteRadar.style.display = radarShown ? "" : "none";
 
-  tasteBars.replaceChildren();
-
-  for (const p of preview) {
-    const row = document.createElement("div");
-    row.className = "taste-bar-row";
-
-    const label = document.createElement("span");
-    label.className = "taste-bar-label";
-    const probeText = p.probe.charAt(0).toUpperCase() + p.probe.slice(1);
-    label.textContent = probeText;
-    label.title = `${categoryMap[p.category]?.label ?? p.category}: ${probeText}`;
-
-    const track = document.createElement("div");
-    track.className = "taste-bar-track";
-
-    const fill = document.createElement("div");
-    fill.className = "taste-bar-fill";
-    // Absolute width: score is 0–1 cosine similarity
-    fill.style.width = `${Math.max(2, p.score * 100)}%`;
-    const hue = Math.round(scoreToHue(Math.max(0, Math.min(1, p.score))));
-    fill.style.background = `hsl(${hue}, 65%, 55%)`;
-
-    track.appendChild(fill);
-
-    const score = document.createElement("span");
-    score.className = "taste-bar-score";
-    score.textContent = p.score.toFixed(2);
-
-    row.append(label, track, score);
-    tasteBars.appendChild(row);
-  }
-
-  // Show "See full profile" link only when there are more probes than shown
-  tasteFullLink.style.display = data.probes.length > POPUP_TOP_K ? "" : "none";
-
+  tasteFullLink.style.display = "";
   tasteMeta.textContent = `Based on ${data.labelCount} labels`;
   tasteBadge.textContent = `${data.probes.length}`;
 }
@@ -540,11 +512,16 @@ async function init() {
     chrome.tabs.create({ url: chrome.runtime.getURL("taste.html") });
   });
 
+  labelsFullLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL("labels.html") });
+  });
+
   // Auto-compute on first fold open if no cached data or stale
   const tasteFold = document.querySelector(".fold-taste") as HTMLDetailsElement;
   tasteFold.addEventListener("toggle", () => {
     if (tasteFold.open && tasteComputing.style.display === "none") {
-      if (tasteBars.children.length === 0 || tasteIsStale) {
+      if (tasteRadar.children.length === 0 || tasteIsStale) {
         tasteIsStale = false;
         void refreshTasteProfile();
       }

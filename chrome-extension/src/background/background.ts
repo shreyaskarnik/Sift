@@ -1082,10 +1082,16 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ error: "Invalid delete payload" });
           return;
         }
-        enqueueLabelWrite((labels) =>
-          labels.filter((l) => !(l.text === matchText && l.timestamp === matchTimestamp)),
-        )
-          .then(() => sendResponse({ success: true }))
+        let deleted: TrainingLabel | undefined;
+        enqueueLabelWrite((labels) => {
+          const idx = labels.findIndex(
+            (l) => l.text === matchText && l.timestamp === matchTimestamp,
+          );
+          if (idx === -1) return labels; // no match — return unchanged
+          deleted = { ...labels[idx] };
+          return labels.filter((_, i) => i !== idx);
+        })
+          .then(() => sendResponse({ success: !!deleted, deleted }))
           .catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
@@ -1105,6 +1111,12 @@ chrome.runtime.onMessage.addListener(
           const textChanged = updates.text !== undefined && updates.text !== matchText;
           const anchorChanged = updates.anchor !== undefined;
 
+          // Explicit anchor change always applies, regardless of text/model state
+          if (anchorChanged) {
+            newAnchor = updates.anchor;
+            newAnchorSource = "override";
+          }
+
           if (textChanged && modelReady) {
             try {
               const [textEmb] = await embed([updates.text!.replace(/\s+/g, " ").trim()]);
@@ -1112,10 +1124,8 @@ chrome.runtime.onMessage.addListener(
               if (ranking) {
                 newAutoAnchor = ranking.top.anchor;
                 newAutoConfidence = ranking.confidence;
-                if (anchorChanged) {
-                  newAnchor = updates.anchor;
-                  newAnchorSource = "override";
-                } else {
+                // Auto-recompute anchor only when user didn't explicitly change it
+                if (!anchorChanged) {
                   newAnchor = ranking.top.anchor;
                   newAnchorSource = "auto";
                 }
@@ -1134,20 +1144,47 @@ chrome.runtime.onMessage.addListener(
             const label = labels[idx];
             if (updates.text !== undefined) label.text = updates.text;
             if (updates.label !== undefined) label.label = updates.label;
-            if (anchorChanged && !textChanged) {
-              label.anchor = updates.anchor!;
-              label.anchorSource = "override";
-            }
-            if (newAnchor !== undefined) label.anchor = newAnchor;
+            // Always store diagnostic auto-fields if available
             if (newAutoAnchor !== undefined) label.autoAnchor = newAutoAnchor;
             if (newAutoConfidence !== undefined) label.autoConfidence = newAutoConfidence;
-            if (newAnchorSource !== undefined) label.anchorSource = newAnchorSource;
+            // Apply anchor: explicit override wins, then auto-recompute (if not manually overridden)
+            if (newAnchor !== undefined) {
+              if (newAnchorSource === "override") {
+                label.anchor = newAnchor;
+                label.anchorSource = "override";
+              } else if (label.anchorSource !== "override") {
+                label.anchor = newAnchor;
+                label.anchorSource = newAnchorSource ?? "auto";
+              }
+            }
 
             labels[idx] = stampAnchorText(label, currentCategoryMap);
             return labels;
           });
           sendResponse({ success: true });
         })().catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
+      case MSG.RESTORE_LABEL: {
+        // Re-insert exact label object at its original chronological position
+        const label = payload as TrainingLabel;
+        if (!label?.text || !label?.timestamp) {
+          sendResponse({ error: "Invalid restore payload" });
+          return;
+        }
+        enqueueLabelWrite((labels) => {
+          // Insert at chronological position (labels sorted newest-first)
+          const insertIdx = labels.findIndex((l) => l.timestamp <= label.timestamp);
+          if (insertIdx === -1) {
+            labels.push(label); // oldest — append at end
+          } else {
+            labels.splice(insertIdx, 0, label);
+          }
+          return labels;
+        })
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
 

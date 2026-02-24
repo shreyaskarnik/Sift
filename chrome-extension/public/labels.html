@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Labels — Sift</title>
+  <style>
+    /* ── Light (default) ── */
+    :root {
+      --bg: #ffffff;
+      --surface: #f4f5f7;
+      --surface-2: #ebedf0;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-hover: rgba(0, 0, 0, 0.15);
+      --text: #1a1c20;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #059669;
+      --radius: 8px;
+      --radius-sm: 5px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e0f11;
+        --surface: #181a1e;
+        --surface-2: #1e2025;
+        --border: rgba(255, 255, 255, 0.06);
+        --border-hover: rgba(255, 255, 255, 0.12);
+        --text: #e4e5e7;
+        --text-muted: #7a7d85;
+        --text-dim: #4e5058;
+        --accent: #34d399;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px 24px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* ── Page Header ── */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      font-size: 12px;
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover {
+      background: var(--surface-2);
+      border-color: var(--border-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* ── Add Panel ── */
+    .add-panel {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .add-panel.visible {
+      display: flex;
+    }
+
+    .add-input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .add-input-row input {
+      flex: 1;
+    }
+
+    .add-field-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      flex: 0 0 70px;
+      align-self: center;
+    }
+
+    .add-preview-row,
+    .add-category-row,
+    .add-polarity-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .add-preview-input {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      font-family: "JetBrains Mono", "SF Mono", monospace;
+      background: var(--surface-2);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .add-preview-input:focus {
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+
+    .add-preview-input::placeholder {
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    .add-status {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .polarity-btn {
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    .polarity-btn:hover {
+      border-color: var(--border-hover);
+    }
+
+    .polarity-btn.active {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+
+    .add-save {
+      width: 100%;
+      padding: 6px 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .add-save:hover {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+
+    .add-save:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* ── Inputs ── */
+    input[type="text"] {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      font-family: "JetBrains Mono", "SF Mono", monospace;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar select {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .filter-bar input[type="text"] {
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .filter-count {
+      font-size: 10px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    /* ── Label Table ── */
+    .label-table {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-family: "JetBrains Mono", "SF Mono", monospace;
+    }
+
+    .label-rank {
+      flex: 0 0 28px;
+      text-align: right;
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    .label-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: white-space 0.15s, outline 0.15s;
+    }
+
+    .label-text.editing {
+      white-space: normal;
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+      padding: 2px 4px;
+    }
+
+    .label-polarity {
+      flex: 0 0 28px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.15s;
+      user-select: none;
+    }
+
+    .label-polarity:hover {
+      transform: scale(1.15);
+    }
+
+    .label-category {
+      flex: 0 0 110px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      transition: border-color 0.15s;
+    }
+
+    .label-category:hover {
+      border-color: var(--border-hover);
+    }
+
+    .label-source {
+      flex: 0 0 32px;
+      font-size: 9px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    .label-delete {
+      flex: 0 0 20px;
+      background: none;
+      border: none;
+      color: #dc2626;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      transition: opacity 0.15s;
+      text-align: center;
+      opacity: 0.45;
+    }
+
+    .label-delete:hover {
+      opacity: 1;
+    }
+
+    /* ── Empty State ── */
+    .empty-state {
+      font-size: 13px;
+      color: var(--text-dim);
+      padding: 32px 0;
+      text-align: center;
+    }
+
+    /* ── Toast Container ── */
+    .toast-container {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 7px 9px;
+      font-size: 11px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
+      pointer-events: auto;
+      animation: toast-in 0.18s ease-out;
+    }
+
+    .toast.success {
+      border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+
+    .toast.error {
+      border-color: color-mix(in srgb, #dc2626 30%, transparent);
+    }
+
+    .toast-action {
+      border: none;
+      background: transparent;
+      color: var(--accent);
+      padding: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .toast-action:hover {
+      text-decoration: underline;
+      background: transparent;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <div>
+      <h1>My Labels</h1>
+      <div class="subtitle" id="subtitle"></div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn" id="export-csv">Export CSV</button>
+      <button class="btn" id="add-label-toggle">+ Add Label</button>
+    </div>
+  </div>
+
+  <div class="add-panel" id="add-panel">
+    <div class="add-input-row">
+      <input type="text" id="add-input" placeholder="Paste text or URL...">
+      <button class="btn" id="add-fetch">Fetch</button>
+    </div>
+    <div class="add-preview-row" id="add-preview-row" style="display:none">
+      <span class="add-field-label">Text</span>
+      <input type="text" class="add-preview-input" id="add-preview" placeholder="Label text...">
+    </div>
+    <div class="add-category-row" id="add-category-row" style="display:none">
+      <span class="add-field-label">Category</span>
+      <select id="add-category"></select>
+    </div>
+    <div class="add-polarity-row" id="add-polarity-row" style="display:none">
+      <span class="add-field-label">Polarity</span>
+      <button class="polarity-btn" id="add-pos">&#x1F44D; Positive</button>
+      <button class="polarity-btn" id="add-neg">&#x1F44E; Negative</button>
+    </div>
+    <span class="add-status" id="add-status"></span>
+    <button class="add-save" id="add-save" style="display:none">Save Label</button>
+  </div>
+
+  <div class="filter-bar">
+    <select id="filter-category"><option value="">All categories</option></select>
+    <select id="filter-polarity">
+      <option value="">All polarity</option>
+      <option value="positive">Positive</option>
+      <option value="negative">Negative</option>
+    </select>
+    <select id="filter-source"><option value="">All sources</option></select>
+    <input type="text" id="filter-search" placeholder="Search labels...">
+    <span class="filter-count" id="filter-count"></span>
+  </div>
+
+  <div id="empty" class="empty-state">Loading...</div>
+  <div id="table" class="label-table"></div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="labels.js"></script>
+</body>
+</html>
