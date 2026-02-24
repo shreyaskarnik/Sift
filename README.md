@@ -50,6 +50,7 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
 - **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; top-5 preview in popup, full-page view with category chips and ranked bars
 - Thumbs up/down training labels with per-anchor CSV export
+- **Label Manager** — full-page view to filter, inline-edit, reassign categories, and add labels by URL (auto-fetches title + suggests best category)
 - X archive import (like.js, bookmark.js)
 - Light/dark mode (follows system)
 - Custom model URL for testing local fine-tuned models
@@ -159,6 +160,7 @@ Popup ──────────chrome.runtime.sendMessage──────
         ├── content/            # HN, Reddit, X content scripts
         │   └── common/         # Shared: batch scorer, styles, widget, labels
         ├── popup/              # Popup UI
+        ├── labels/             # Label Manager (full-page label editor)
         ├── taste/              # Full-page taste profile viewer
         ├── agent/              # Agent mode: taste-ranked HN feed (experimental)
         ├── shared/             # Constants, types, taste probes, cache-key utils
