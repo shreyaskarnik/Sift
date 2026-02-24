@@ -52,6 +52,13 @@ let activeIds: string[] = [];
 let addPolarity: "positive" | "negative" | null = null;
 let addRanking: PresetRanking | undefined;
 
+/** Sends a message and throws if the response contains an error field. */
+async function sendMsg(msg: { type: string; payload?: unknown }): Promise<Record<string, unknown>> {
+  const resp = (await chrome.runtime.sendMessage(msg)) as Record<string, unknown>;
+  if (resp?.error) throw new Error(String(resp.error));
+  return resp;
+}
+
 const SOURCE_DISPLAY: Record<string, string> = {
   hn: "HN",
   reddit: "red",
@@ -260,7 +267,7 @@ function createRow(label: TrainingLabel, displayIndex: number): HTMLDivElement {
     };
 
     try {
-      await chrome.runtime.sendMessage({ type: MSG.UPDATE_LABEL, payload });
+      await sendMsg({ type: MSG.UPDATE_LABEL, payload });
       await loadLabels();
     } catch {
       textSpan.textContent = originalText;
@@ -284,7 +291,7 @@ function createRow(label: TrainingLabel, displayIndex: number): HTMLDivElement {
     };
 
     try {
-      await chrome.runtime.sendMessage({ type: MSG.UPDATE_LABEL, payload });
+      await sendMsg({ type: MSG.UPDATE_LABEL, payload });
       await loadLabels();
     } catch {
       showToast("Failed to update polarity", { variant: "error" });
@@ -346,7 +353,7 @@ function createRow(label: TrainingLabel, displayIndex: number): HTMLDivElement {
       };
 
       try {
-        await chrome.runtime.sendMessage({ type: MSG.UPDATE_LABEL, payload });
+        await sendMsg({ type: MSG.UPDATE_LABEL, payload });
         await loadLabels();
       } catch {
         revert();
@@ -381,17 +388,17 @@ function createRow(label: TrainingLabel, displayIndex: number): HTMLDivElement {
     };
 
     try {
-      const resp = await chrome.runtime.sendMessage({
+      const resp = await sendMsg({
         type: MSG.DELETE_LABEL,
         payload: deletePayload,
       });
-      if ((resp as { success: boolean }).success) {
+      if (resp.success) {
         await loadLabels();
         showToast("Deleted", {
           actionLabel: "Undo",
           onAction: async () => {
             try {
-              await chrome.runtime.sendMessage({
+              await sendMsg({
                 type: MSG.RESTORE_LABEL,
                 payload: stashedLabel,
               });
@@ -529,6 +536,7 @@ async function handleFetchOrResolve(): Promise<void> {
       const typed = resp as { title?: string; error?: string };
       if (typed.title) {
         resolvedText = typed.title;
+        addStatus.textContent = "";
       } else {
         addStatus.textContent = "Couldn\u2019t fetch title \u2014 using input as text";
       }
@@ -602,7 +610,7 @@ async function handleAddSave(): Promise<void> {
   };
 
   try {
-    await chrome.runtime.sendMessage({
+    await sendMsg({
       type: MSG.SAVE_LABEL,
       payload: savePayload,
     });

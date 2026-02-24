@@ -620,9 +620,7 @@ async function setAnchor(anchor: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function stampAnchorText(label: TrainingLabel, catMap: CategoryMap): TrainingLabel {
-  if (!label.anchorText) {
-    label.anchorText = catMap[label.anchor]?.anchorText ?? label.anchor;
-  }
+  label.anchorText = catMap[label.anchor]?.anchorText ?? label.anchor;
   return label;
 }
 
@@ -1147,11 +1145,13 @@ chrome.runtime.onMessage.addListener(
             }
           }
 
+          let found = false;
           await enqueueLabelWrite((labels) => {
             const idx = labels.findIndex(
               (l) => l.text === matchText && l.timestamp === matchTimestamp,
             );
             if (idx === -1) return labels;
+            found = true;
 
             const label = labels[idx];
             if (updates.text !== undefined) label.text = updates.text;
@@ -1173,7 +1173,7 @@ chrome.runtime.onMessage.addListener(
             labels[idx] = stampAnchorText(label, currentCategoryMap);
             return labels;
           });
-          sendResponse({ success: true });
+          sendResponse({ success: found });
         })().catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
