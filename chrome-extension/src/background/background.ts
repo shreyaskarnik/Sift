@@ -1070,7 +1070,19 @@ chrome.runtime.onMessage.addListener(
           });
           const html = await resp.text();
           const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-          const title = match ? match[1].trim() : "";
+          const raw = match ? match[1].trim() : "";
+          // Decode HTML entities (service worker has no DOM)
+          const title = raw
+            .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+            .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'")
+            .replace(/&ndash;/g, "\u2013")
+            .replace(/&mdash;/g, "\u2014")
+            .replace(/&nbsp;/g, " ");
           sendResponse({ title });
         })().catch((err) => sendResponse({ error: String(err) }));
         return true;
