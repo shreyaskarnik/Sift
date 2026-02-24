@@ -9,6 +9,8 @@
 
 Sift through the noise. Score your feed with EmbeddingGemma, right in the browser.
 
+Inspired by [google/embeddinggemma-tuning-lab](https://huggingface.co/spaces/google/embeddinggemma-tuning-lab)
+
 Sift is a Chrome extension that runs EmbeddingGemma directly in the browser via Transformers.js + WebGPU:
 
 - [EmbeddingGemma-300M](https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX) (q4) — scores content against your interests using cosine similarity
@@ -20,7 +22,7 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 
 ## Demo
 
-https://github.com/user-attachments/assets/a958732b-cb5e-457d-b1a6-8423c55ecb9a
+<https://github.com/user-attachments/assets/a958732b-cb5e-457d-b1a6-8423c55ecb9a>
 
 ## At a Glance
 
@@ -98,8 +100,9 @@ Fine-tune EmbeddingGemma on your collected labels, export to ONNX, and quantize 
 ### Prerequisites
 
 EmbeddingGemma is a gated model — you need to:
-1. **Accept the license** at https://huggingface.co/google/embeddinggemma-300m
-2. **Create an HF token** (read access) at https://huggingface.co/settings/tokens
+
+1. **Accept the license** at <https://huggingface.co/google/embeddinggemma-300m>
+2. **Create an HF token** (read access) at <https://huggingface.co/settings/tokens>
 
 ### Colab (recommended if you don't have a GPU)
 

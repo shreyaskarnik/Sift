@@ -122,7 +122,44 @@ function holdFrame(sourcePath, seconds) {
 const LOGO_PATH = join(ROOT, "docs", "assets", "logo.png");
 const LOGO_DATA_URI = `data:image/png;base64,${readFileSync(LOGO_PATH).toString("base64")}`;
 
-function titleCardHTML(title, subtitle, { logo = false } = {}) {
+// All 25 built-in category labels for the word cloud
+const CATEGORY_LABELS = [
+  "News", "AI Research", "Startups", "Deep Tech", "Science",
+  "Programming", "Open Source", "Security & Privacy", "Design & UX",
+  "Product & SaaS", "Finance & Markets", "Crypto & Web3", "Politics",
+  "Legal & Policy", "Climate & Energy", "Space & Aerospace",
+  "Health & Biotech", "Education", "Gaming", "Sports", "Music",
+  "Culture & Arts", "Food & Cooking", "Travel", "Parenting",
+];
+
+// Deterministic pseudo-random from seed (for reproducible layouts)
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function wordCloudHTML() {
+  const rng = mulberry32(42);
+  const spans = [];
+  // Place each label with seeded random position, size, and opacity
+  for (const label of CATEGORY_LABELS) {
+    const x = 5 + rng() * 85;       // 5-90% from left
+    const y = 5 + rng() * 85;       // 5-90% from top
+    const size = 13 + rng() * 9;    // 13-22px
+    const opacity = 0.04 + rng() * 0.06; // 0.04-0.10
+    const rotate = (rng() - 0.5) * 12;   // -6 to +6 degrees
+    spans.push(
+      `<span style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;font-size:${size.toFixed(0)}px;opacity:${opacity.toFixed(2)};transform:rotate(${rotate.toFixed(1)}deg)">${label}</span>`
+    );
+  }
+  return `<div class="word-cloud">${spans.join("\n    ")}</div>`;
+}
+
+function titleCardHTML(title, subtitle, { logo = false, poweredBy = false, wordCloud = false } = {}) {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -143,12 +180,32 @@ function titleCardHTML(title, subtitle, { logo = false } = {}) {
       color: #e4e5e7;
       font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
       overflow: hidden;
+      position: relative;
+    }
+    .word-cloud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .word-cloud span {
+      position: absolute;
+      color: #34d399;
+      font-weight: 500;
+      font-size: 13px;
+      white-space: nowrap;
+      padding: 2px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(52, 211, 153, 0.18);
+      background: rgba(52, 211, 153, 0.06);
     }
     .logo {
       width: 80px;
       height: 80px;
       border-radius: 16px;
       margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
     }
     .title {
       font-size: 48px;
@@ -157,6 +214,8 @@ function titleCardHTML(title, subtitle, { logo = false } = {}) {
       margin-bottom: 16px;
       text-align: center;
       line-height: 1.2;
+      position: relative;
+      z-index: 1;
     }
     .subtitle {
       font-size: 22px;
@@ -165,14 +224,35 @@ function titleCardHTML(title, subtitle, { logo = false } = {}) {
       text-align: center;
       max-width: 700px;
       line-height: 1.5;
+      position: relative;
+      z-index: 1;
     }
     .accent { color: #34d399; }
+    .powered-by {
+      margin-top: 32px;
+      font-size: 14px;
+      font-weight: 400;
+      color: #4e5058;
+      letter-spacing: 0.02em;
+      position: relative;
+      z-index: 1;
+    }
+    .powered-by a {
+      color: #7a7d85;
+      text-decoration: none;
+    }
+    .powered-by .sep {
+      margin: 0 8px;
+      color: #3a3c42;
+    }
   </style>
 </head>
 <body>
+  ${wordCloud ? wordCloudHTML() : ""}
   ${logo ? `<img class="logo" src="${LOGO_DATA_URI}" />` : ""}
   <div class="title">${title}</div>
   ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ""}
+  ${poweredBy ? `<div class="powered-by">Powered by <a>EmbeddingGemma</a><span class="sep">·</span><a>Transformers.js</a><span class="sep">·</span><a>WebGPU</a><span class="sep">·</span><a>Chrome Extensions</a></div>` : ""}
 </body>
 </html>`;
 }
@@ -252,7 +332,7 @@ function buildScenes() {
       html: titleCardHTML(
         '<span class="accent">Sift</span>',
         "Score your feed with EmbeddingGemma, right in the browser.",
-        { logo: true },
+        { logo: true, poweredBy: true },
       ),
       hold: TITLE_HOLD_SEC,
     },
@@ -291,6 +371,7 @@ function buildScenes() {
       html: titleCardHTML(
         "The Popup",
         "Page score, category pills, 25 built-in categories, taste profile, training data.",
+        { wordCloud: true },
       ),
       hold: TITLE_HOLD_SEC,
     },
