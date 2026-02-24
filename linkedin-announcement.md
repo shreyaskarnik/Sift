@@ -14,19 +14,17 @@ Shipped today:
 - Taste Profile with interactive radar chart
 - Label Manager for filtering, edits, category reassignment, and URL-based label add
 
-Training loop:
-1. Label while browsing
-2. Export CSV
-3. Fine-tune in Colab or locally
-4. Reload your model in the extension
-
-WebGPU when available, WASM fallback.
+💡 The "aha" moment for me was the training loop. You can:
+- 👍👎 Label items with thumbs up/down as you browse
+- 🗂️ Curate your labels in a full Label Manager - inline edit text, flip polarity, reassign categories, and add labels manually by pasting a URL (it auto-fetches the title and suggests the best category)
+- 📤 Export those labels as training triplets
+- 🧪 Fine-tune the model on your personal preferences (one click in a free Colab notebook, or locally)
+- 🚀 Load the fine-tuned model back into the extension (WebGPU when available, WASM fallback)
+- 🔒 Privacy-first: no backend collecting your feed behavior; inference + labels stay local
+- 🆓 Free to run: no per-token API costs
 
 Near-term prototype:
 I'm testing an Agent mode that fetches and ranks top HN stories by your taste vector.
-
-Privacy model:
-No backend collecting your feed behavior; inference + labels stay local.
 
 Built with Transformers.js, EmbeddingGemma, Chrome Extensions MV3, and ONNX tooling.
 
