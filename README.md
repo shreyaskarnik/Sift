@@ -49,6 +49,7 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - 25 built-in categories across tech, world, and lifestyle groups (user-defined categories coming soon)
 - **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
 - **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; top-5 preview in popup, full-page view with category chips and ranked bars
+- **Interactive radar chart** — SVG spider chart of your taste across all categories; click any axis to drill into that category's sub-topic probes
 - Thumbs up/down training labels with per-anchor CSV export
 - **Label Manager** — full-page view to filter, inline-edit, reassign categories, and add labels by URL (auto-fetches title + suggests best category)
 - X archive import (like.js, bookmark.js)
