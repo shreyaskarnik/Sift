@@ -52,6 +52,9 @@ import type {
   PresetRank,
   TasteProbeResult,
   TasteProfileResponse,
+  UpdateLabelPayload,
+  DeleteLabelPayload,
+  FetchPageTitlePayload,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
 import { TASTE_PROBES } from "../shared/taste-probes";
@@ -1051,6 +1054,100 @@ chrome.runtime.onMessage.addListener(
         enqueueLabelWrite((labels) => { labels.push(...stamped); return labels; })
           .then(() => sendResponse({ success: true, count: stamped.length }))
           .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
+      case MSG.FETCH_PAGE_TITLE: {
+        const { url } = (payload ?? {}) as FetchPageTitlePayload;
+        if (!url || typeof url !== "string") {
+          sendResponse({ error: "Invalid URL" });
+          return;
+        }
+        (async () => {
+          const resp = await fetch(url, {
+            headers: { "Accept": "text/html" },
+            redirect: "follow",
+          });
+          const html = await resp.text();
+          const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          const title = match ? match[1].trim() : "";
+          sendResponse({ title });
+        })().catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
+      case MSG.DELETE_LABEL: {
+        const { matchText, matchTimestamp } = (payload ?? {}) as DeleteLabelPayload;
+        if (!matchText || !matchTimestamp) {
+          sendResponse({ error: "Invalid delete payload" });
+          return;
+        }
+        enqueueLabelWrite((labels) =>
+          labels.filter((l) => !(l.text === matchText && l.timestamp === matchTimestamp)),
+        )
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
+      case MSG.UPDATE_LABEL: {
+        const { matchText, matchTimestamp, updates } = (payload ?? {}) as UpdateLabelPayload;
+        if (!matchText || !matchTimestamp || !updates) {
+          sendResponse({ error: "Invalid update payload" });
+          return;
+        }
+        (async () => {
+          let newAnchor: string | undefined;
+          let newAutoAnchor: string | undefined;
+          let newAutoConfidence: number | undefined;
+          let newAnchorSource: "auto" | "override" | "fallback" | undefined;
+
+          const textChanged = updates.text !== undefined && updates.text !== matchText;
+          const anchorChanged = updates.anchor !== undefined;
+
+          if (textChanged && modelReady) {
+            try {
+              const [textEmb] = await embed([updates.text!.replace(/\s+/g, " ").trim()]);
+              const ranking = rankPresets(textEmb);
+              if (ranking) {
+                newAutoAnchor = ranking.top.anchor;
+                newAutoConfidence = ranking.confidence;
+                if (anchorChanged) {
+                  newAnchor = updates.anchor;
+                  newAnchorSource = "override";
+                } else {
+                  newAnchor = ranking.top.anchor;
+                  newAnchorSource = "auto";
+                }
+              }
+            } catch {
+              // Scoring failed — keep existing anchor metadata
+            }
+          }
+
+          await enqueueLabelWrite((labels) => {
+            const idx = labels.findIndex(
+              (l) => l.text === matchText && l.timestamp === matchTimestamp,
+            );
+            if (idx === -1) return labels;
+
+            const label = labels[idx];
+            if (updates.text !== undefined) label.text = updates.text;
+            if (updates.label !== undefined) label.label = updates.label;
+            if (anchorChanged && !textChanged) {
+              label.anchor = updates.anchor!;
+              label.anchorSource = "override";
+            }
+            if (newAnchor !== undefined) label.anchor = newAnchor;
+            if (newAutoAnchor !== undefined) label.autoAnchor = newAutoAnchor;
+            if (newAutoConfidence !== undefined) label.autoConfidence = newAutoConfidence;
+            if (newAnchorSource !== undefined) label.anchorSource = newAnchorSource;
+
+            labels[idx] = stampAnchorText(label, currentCategoryMap);
+            return labels;
+          });
+          sendResponse({ success: true });
+        })().catch((err) => sendResponse({ error: String(err) }));
         return true;
       }
 
