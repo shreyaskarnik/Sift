@@ -190,3 +190,23 @@ export interface TasteProfileResponse {
   timestamp: number;
   cacheKey: string;
 }
+
+/** A single HN story scored by the agent */
+export interface AgentStory {
+  id: number;
+  title: string;
+  url: string;
+  domain: string;
+  hnScore: number;
+  by: string;
+  time: number;
+  descendants: number;
+  tasteScore: number;
+}
+
+/** Response from AGENT_FETCH_HN */
+export interface AgentFetchHNResponse {
+  stories: AgentStory[];
+  elapsed: number;
+  error?: string;
+}

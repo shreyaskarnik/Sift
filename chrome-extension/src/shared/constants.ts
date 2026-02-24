@@ -108,6 +108,9 @@ export const MSG = {
   UPDATE_LABEL: "UPDATE_LABEL",
   DELETE_LABEL: "DELETE_LABEL",
   RESTORE_LABEL: "RESTORE_LABEL",
+
+  // Agent
+  AGENT_FETCH_HN: "AGENT_FETCH_HN",
 } as const;
 
 /** Storage keys for chrome.storage.local */
