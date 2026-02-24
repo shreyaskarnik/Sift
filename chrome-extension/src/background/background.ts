@@ -34,6 +34,7 @@ import {
   TASTE_MIN_NEGATIVES,
 } from "../shared/constants";
 import type {
+  AgentStory,
   CategoryDef,
   CategoryMap,
   ExtensionMessage,
@@ -349,7 +350,79 @@ function normalizeTasteText(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/** Simple djb2 hash for cache key construction. */
+/**
+ * Compute a contrastive taste vector from the user's labels.
+ * Returns null if the model isn't loaded or there are insufficient positive labels.
+ * This is extracted from computeTasteProfile() for reuse by other features (e.g. agent).
+ */
+async function computeTasteVec(): Promise<Float32Array | null> {
+  if (!model || !tokenizer) return null;
+
+  // 1. Read and dedupe labels (newest first so latest label wins contradictions)
+  const labels = await readLabels();
+  labels.sort((a, b) => b.timestamp - a.timestamp);
+  const seen = new Set<string>();
+  const positives: string[] = [];
+  const negatives: string[] = [];
+
+  for (const l of labels) {
+    const norm = normalizeTasteText(l.text);
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    if (l.label === "positive") positives.push(l.text);
+    else negatives.push(l.text);
+  }
+
+  if (positives.length < TASTE_MIN_LABELS) return null;
+
+  // 2. Embed positive labels in batches, L2-normalize each
+  const posEmbeddings: Float32Array[] = [];
+  for (let i = 0; i < positives.length; i += SCORE_BATCH_SIZE) {
+    const batch = positives.slice(i, i + SCORE_BATCH_SIZE);
+    const embs = await embed(batch);
+    for (const e of embs) posEmbeddings.push(l2Normalize(e));
+  }
+
+  // 3. Compute positive centroid
+  const dim = posEmbeddings[0].length;
+  const posCentroid = new Float32Array(dim);
+  for (const emb of posEmbeddings) {
+    for (let j = 0; j < dim; j++) posCentroid[j] += emb[j];
+  }
+  for (let j = 0; j < dim; j++) posCentroid[j] /= posEmbeddings.length;
+
+  // 4. Contrastive: subtract scaled negative centroid if enough negatives
+  const tasteVec = new Float32Array(posCentroid);
+  if (negatives.length >= TASTE_MIN_NEGATIVES) {
+    const negEmbeddings: Float32Array[] = [];
+    for (let i = 0; i < negatives.length; i += SCORE_BATCH_SIZE) {
+      const batch = negatives.slice(i, i + SCORE_BATCH_SIZE);
+      const embs = await embed(batch);
+      for (const e of embs) negEmbeddings.push(l2Normalize(e));
+    }
+    const negCentroid = new Float32Array(dim);
+    for (const emb of negEmbeddings) {
+      for (let j = 0; j < dim; j++) negCentroid[j] += emb[j];
+    }
+    for (let j = 0; j < dim; j++) negCentroid[j] /= negEmbeddings.length;
+
+    // tasteVec = posCentroid - alpha * negCentroid
+    for (let j = 0; j < dim; j++) {
+      tasteVec[j] -= TASTE_NEG_ALPHA * negCentroid[j];
+    }
+  }
+
+  // 5. L2-normalize; fallback to posCentroid if contrastive subtraction collapsed it
+  let norm = 0;
+  for (let j = 0; j < dim; j++) norm += tasteVec[j] * tasteVec[j];
+  if (Math.sqrt(norm) < 1e-6) {
+    tasteVec.set(posCentroid);
+  }
+  l2Normalize(tasteVec);
+
+  return tasteVec;
+}
+
 async function computeTasteProfile(): Promise<TasteProfileResponse> {
   if (!model || !tokenizer) {
     return {
@@ -1206,6 +1279,102 @@ chrome.runtime.onMessage.addListener(
         })
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ error: String(err) }));
+        return true;
+      }
+
+      case MSG.AGENT_FETCH_HN: {
+        const t0 = performance.now();
+        (async () => {
+          // 1. Compute taste vector
+          const tasteVec = await computeTasteVec();
+          if (!tasteVec) {
+            return { stories: [], elapsed: 0, error: "Taste profile not ready — label more items first." };
+          }
+
+          // 2. Fetch top story IDs from HN API
+          const idsResp = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
+          if (!idsResp.ok) {
+            sendResponse({ stories: [], elapsed: 0, error: `HN API returned ${idsResp.status}` });
+            return;
+          }
+          const storyIds: unknown = await idsResp.json();
+          if (!Array.isArray(storyIds)) {
+            sendResponse({ stories: [], elapsed: 0, error: "Unexpected HN API response format" });
+            return;
+          }
+
+          // 3. Batch-fetch item details with concurrency cap of 20
+          const CONCURRENCY = 20;
+          interface HNItem {
+            id: number;
+            title?: string;
+            url?: string;
+            score?: number;
+            by?: string;
+            time?: number;
+            descendants?: number;
+            type?: string;
+            deleted?: boolean;
+            dead?: boolean;
+          }
+          const items: HNItem[] = [];
+          for (let i = 0; i < storyIds.length; i += CONCURRENCY) {
+            const batch = storyIds.slice(i, i + CONCURRENCY);
+            const fetched = await Promise.all(
+              batch.map((id) =>
+                fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+                  .then((r) => r.json() as Promise<HNItem | null>)
+                  .catch(() => null),
+              ),
+            );
+            for (const item of fetched) {
+              if (item) items.push(item);
+            }
+          }
+
+          // 4. Filter: drop deleted, dead, non-story types, empty titles
+          const valid = items.filter(
+            (item) => !item.deleted && !item.dead && item.type === "story" && item.title?.trim(),
+          );
+
+          // 5. Embed all titles in batches, L2-normalize each
+          const titles = valid.map((item) => item.title!.trim());
+          const titleEmbeddings: Float32Array[] = [];
+          for (let i = 0; i < titles.length; i += SCORE_BATCH_SIZE) {
+            const batch = titles.slice(i, i + SCORE_BATCH_SIZE);
+            const embs = await embed(batch);
+            for (const e of embs) titleEmbeddings.push(l2Normalize(e));
+          }
+
+          // 6. Score each via cosine similarity and build AgentStory[]
+          const scored: AgentStory[] = valid.map((item, i) => {
+            let domain = "";
+            if (item.url) {
+              try {
+                domain = new URL(item.url).hostname.replace(/^www\./, "");
+              } catch { /* invalid URL — leave empty */ }
+            }
+            return {
+              id: item.id,
+              title: item.title!.trim(),
+              url: item.url ?? "",
+              domain,
+              hnScore: item.score ?? 0,
+              by: item.by ?? "",
+              time: item.time ?? 0,
+              descendants: item.descendants ?? 0,
+              tasteScore: cosineSimilarity(titleEmbeddings[i], tasteVec),
+            };
+          });
+
+          // 7. Sort by tasteScore descending, return top 50
+          scored.sort((a, b) => b.tasteScore - a.tasteScore);
+          const top50 = scored.slice(0, 50);
+          const elapsed = Math.round(performance.now() - t0);
+          return { stories: top50, elapsed };
+        })()
+          .then((result) => sendResponse(result))
+          .catch((err) => sendResponse({ stories: [], elapsed: 0, error: String(err) }));
         return true;
       }
 
