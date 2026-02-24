@@ -620,7 +620,9 @@ async function setAnchor(anchor: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function stampAnchorText(label: TrainingLabel, catMap: CategoryMap): TrainingLabel {
-  label.anchorText = catMap[label.anchor]?.anchorText ?? label.anchor;
+  if (!label.anchorText) {
+    label.anchorText = catMap[label.anchor]?.anchorText ?? label.anchor;
+  }
   return label;
 }
 
@@ -1174,6 +1176,7 @@ chrome.runtime.onMessage.addListener(
             // Only re-stamp anchorText when anchor actually changed —
             // preserve historical anchorText for training data integrity
             if (label.anchor !== anchorBefore) {
+              label.anchorText = "";  // clear so stampAnchorText fills fresh
               stampAnchorText(label, currentCategoryMap);
             }
             labels[idx] = label;
