@@ -84,7 +84,7 @@ Also shipped: Taste Profile with an interactive radar chart.
 Near-term prototype: Agent mode for HN that fetches and ranks top stories by your taste vector.
 
 **Tweet 5 (CTA):**
-Stack: TypeScript, Chrome MV3, Transformers.js, EmbeddingGemma, ONNX, WebGPU.
+Stack: TypeScript, Chrome MV3, @huggingface Transformers.js, @Google EmbeddingGemma, ONNX, WebGPU.
 
 Open source + training notebook: [link]
 
