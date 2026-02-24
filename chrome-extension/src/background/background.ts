@@ -435,7 +435,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     };
   }
 
-  // 1. Read and dedupe labels (newest first so latest label wins contradictions)
+  // 1. Read and dedupe labels (needed for labelCount + cache key)
   const labels = await readLabels();
   labels.sort((a, b) => b.timestamp - a.timestamp);
   const seen = new Set<string>();
@@ -450,7 +450,9 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     else negatives.push(l.text);
   }
 
-  if (positives.length < TASTE_MIN_LABELS) {
+  // 2. Compute contrastive taste vector (reuses computeTasteVec which reads labels independently)
+  const tasteVec = await computeTasteVec();
+  if (!tasteVec) {
     const need = TASTE_MIN_LABELS - positives.length;
     return {
       state: "insufficient_labels",
@@ -462,52 +464,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     };
   }
 
-  // 2. Embed positive labels in batches, L2-normalize each
-  const posEmbeddings: Float32Array[] = [];
-  for (let i = 0; i < positives.length; i += SCORE_BATCH_SIZE) {
-    const batch = positives.slice(i, i + SCORE_BATCH_SIZE);
-    const embs = await embed(batch);
-    for (const e of embs) posEmbeddings.push(l2Normalize(e));
-  }
-
-  // 3. Compute positive centroid
-  const dim = posEmbeddings[0].length;
-  const posCentroid = new Float32Array(dim);
-  for (const emb of posEmbeddings) {
-    for (let j = 0; j < dim; j++) posCentroid[j] += emb[j];
-  }
-  for (let j = 0; j < dim; j++) posCentroid[j] /= posEmbeddings.length;
-
-  // 4. Contrastive: subtract scaled negative centroid if enough negatives
-  const tasteVec = new Float32Array(posCentroid);
-  if (negatives.length >= TASTE_MIN_NEGATIVES) {
-    const negEmbeddings: Float32Array[] = [];
-    for (let i = 0; i < negatives.length; i += SCORE_BATCH_SIZE) {
-      const batch = negatives.slice(i, i + SCORE_BATCH_SIZE);
-      const embs = await embed(batch);
-      for (const e of embs) negEmbeddings.push(l2Normalize(e));
-    }
-    const negCentroid = new Float32Array(dim);
-    for (const emb of negEmbeddings) {
-      for (let j = 0; j < dim; j++) negCentroid[j] += emb[j];
-    }
-    for (let j = 0; j < dim; j++) negCentroid[j] /= negEmbeddings.length;
-
-    // tasteVec = posCentroid - alpha * negCentroid
-    for (let j = 0; j < dim; j++) {
-      tasteVec[j] -= TASTE_NEG_ALPHA * negCentroid[j];
-    }
-  }
-
-  // 5. L2-normalize the taste vector; fallback to posCentroid if contrastive subtraction collapsed it
-  let norm = 0;
-  for (let j = 0; j < dim; j++) norm += tasteVec[j] * tasteVec[j];
-  if (Math.sqrt(norm) < 1e-6) {
-    tasteVec.set(posCentroid);
-  }
-  l2Normalize(tasteVec);
-
-  // 6. Gather probes for active categories only (read from storage, not currentCategoryMap which includes archived)
+  // 3. Gather probes for active categories only (read from storage, not currentCategoryMap which includes archived)
   const catStore = await chrome.storage.local.get([STORAGE_KEYS.ACTIVE_CATEGORY_IDS]);
   const activeIds = new Set<string>(
     (catStore[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined) ?? [...DEFAULT_ACTIVE_IDS],
@@ -520,7 +477,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     }
   }
 
-  // 7. Embed probes in batches, L2-normalize each
+  // 4. Embed probes in batches, L2-normalize each
   const probeTexts = probeEntries.map((p) => p.probe);
   const probeEmbeddings: Float32Array[] = [];
   for (let i = 0; i < probeTexts.length; i += SCORE_BATCH_SIZE) {
@@ -529,14 +486,14 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     for (const e of embs) probeEmbeddings.push(l2Normalize(e));
   }
 
-  // 8. Score each probe against taste vector
+  // 5. Score each probe against taste vector
   const scored: TasteProbeResult[] = probeEntries.map((entry, i) => ({
     probe: entry.probe,
     score: cosineSimilarity(probeEmbeddings[i], tasteVec),
     category: entry.category,
   }));
 
-  // 9. Sort and apply diversity cap (max N per category)
+  // 6. Sort and apply diversity cap (max N per category)
   scored.sort((a, b) => b.score - a.score);
   const catCount: Record<string, number> = {};
   const diverseTop: TasteProbeResult[] = [];
@@ -548,7 +505,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     if (diverseTop.length >= TASTE_TOP_K) break;
   }
 
-  // 10. Build composite cache key
+  // 7. Build composite cache key
   const modelIdStore = await chrome.storage.local.get([
     STORAGE_KEYS.CUSTOM_MODEL_ID,
     STORAGE_KEYS.CUSTOM_MODEL_URL,
@@ -558,7 +515,7 @@ async function computeTasteProfile(): Promise<TasteProfileResponse> {
     || "default";
   const cacheKey = computeTasteCacheKeyFromParts(positives, negatives, activeIds, modelKey);
 
-  // 11. Cache and return
+  // 8. Cache and return
   const response: TasteProfileResponse = {
     state: "ready",
     probes: diverseTop,
