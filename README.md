@@ -160,6 +160,7 @@ Popup ──────────chrome.runtime.sendMessage──────
         │   └── common/         # Shared: batch scorer, styles, widget, labels
         ├── popup/              # Popup UI
         ├── taste/              # Full-page taste profile viewer
+        ├── agent/              # Agent mode: taste-ranked HN feed (experimental)
         ├── shared/             # Constants, types, taste probes, cache-key utils
         └── storage/            # CSV export, X archive parser
 ```
