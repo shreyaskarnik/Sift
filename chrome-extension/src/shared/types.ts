@@ -202,6 +202,7 @@ export interface AgentStory {
   time: number;
   descendants: number;
   tasteScore: number;
+  topCategory?: string;
 }
 
 /** Response from AGENT_FETCH_HN */

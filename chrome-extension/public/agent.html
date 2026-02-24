@@ -37,38 +37,40 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      font-family: Verdana, Geneva, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding: 32px 24px;
-      max-width: 720px;
+      padding: 16px 0;
+      max-width: 780px;
       margin: 0 auto;
     }
 
-    h1 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 4px;
+    /* ── Header Bar ── */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
     }
 
-    .subtitle {
-      font-size: 12px;
+    .header-bar h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .header-bar .subtitle {
+      font-size: 10px;
       color: var(--text-dim);
     }
 
-    /* ── Page Header ── */
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-
-    /* ── Buttons ── */
-    .btn-accent {
-      font-size: 12px;
+    .btn-fetch {
+      margin-left: auto;
+      font-size: 11px;
       font-weight: 600;
-      padding: 6px 12px;
+      padding: 4px 10px;
       border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
       border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -78,107 +80,127 @@
       transition: background 0.15s, border-color 0.15s;
     }
 
-    .btn-accent:hover {
+    .btn-fetch:hover {
       background: color-mix(in srgb, var(--accent) 18%, transparent);
       border-color: color-mix(in srgb, var(--accent) 50%, transparent);
     }
 
-    .btn-accent:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
+    .btn-fetch:disabled { opacity: 0.5; cursor: default; }
 
     /* ── Status ── */
     .status {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-dim);
-      margin-bottom: 12px;
+      padding: 0 16px;
+      margin-bottom: 4px;
+      min-height: 14px;
     }
 
     /* ── Empty State ── */
     .empty-state {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-dim);
-      padding: 32px 0;
+      padding: 48px 16px;
       text-align: center;
     }
 
-    /* ── Story List ── */
+    /* ── Story List (HN-like) ── */
     .story-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
+      padding: 0 4px;
     }
 
-    .story-row {
+    /* Title row: rank + title + domain */
+    .story-athing {
       display: flex;
       align-items: baseline;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
+      padding: 2px 0 0;
     }
 
     .story-rank {
-      flex: 0 0 24px;
+      flex: 0 0 30px;
       text-align: right;
+      padding-right: 6px;
       color: var(--text-dim);
-      font-family: "JetBrains Mono", "SF Mono", monospace;
-      font-size: 10px;
+      font-size: 11px;
     }
 
-    .story-body {
-      flex: 1;
-      min-width: 0;
+    .story-titleline {
+      font-size: 12.5px;
+      line-height: 1.35;
     }
 
-    .story-title {
-      font-size: 13px;
-      line-height: 1.4;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .story-title a {
+    .story-titleline a {
       color: var(--text);
       text-decoration: none;
-      transition: color 0.15s;
     }
 
-    .story-title a:hover {
-      color: var(--accent);
-    }
-
-    .story-title a:visited {
+    .story-titleline a:visited {
       color: var(--text-muted);
     }
 
-    .story-meta {
-      font-size: 10px;
-      color: var(--text-dim);
-      display: flex;
-      flex-direction: row;
-      gap: 8px;
-      flex-wrap: wrap;
+    .story-titleline a:hover {
+      text-decoration: underline;
     }
 
-    .story-score {
-      flex: 0 0 42px;
-      text-align: right;
-      font-family: "JetBrains Mono", "SF Mono", monospace;
-      font-size: 11px;
-      font-weight: 600;
+    .story-domain {
+      font-size: 9.5px;
+      color: var(--text-dim);
+      margin-left: 5px;
+    }
+
+    .story-category {
+      font-size: 8.5px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0 6px;
+      margin-left: 6px;
+      vertical-align: 1px;
+      white-space: nowrap;
+    }
+
+    /* Subtext row: points, author, time, comments | taste score */
+    .story-subtext {
+      display: flex;
+      align-items: baseline;
+      padding: 1px 0 5px;
+      margin-left: 36px;
+      font-size: 9.5px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .story-subtext a {
+      color: var(--text-dim);
+      text-decoration: none;
+    }
+
+    .story-subtext a:hover {
+      text-decoration: underline;
+    }
+
+    .story-subline {
+      flex: 1;
+    }
+
+    .story-taste {
+      flex: 0 0 auto;
+      font-size: 10px;
+      font-weight: 700;
       color: var(--accent);
+      padding-left: 12px;
+      white-space: nowrap;
     }
   </style>
 </head>
 <body>
-  <div class="page-header">
+  <div class="header-bar">
     <div>
-      <h1>Agent</h1>
+      <h1>Sift Agent</h1>
       <div class="subtitle">Your personalized HN feed</div>
     </div>
-    <button class="btn-accent" id="fetch-btn">Fetch my feed</button>
+    <button class="btn-fetch" id="fetch-btn">Fetch my feed</button>
   </div>
 
   <div class="status" id="status"></div>

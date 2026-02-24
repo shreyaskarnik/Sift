@@ -1,5 +1,7 @@
-import { MSG } from "../shared/constants";
-import type { AgentFetchHNResponse, AgentStory } from "../shared/types";
+import { MSG, STORAGE_KEYS } from "../shared/constants";
+import type { AgentFetchHNResponse, AgentStory, CategoryMap } from "../shared/types";
+
+let categoryMap: CategoryMap = {};
 
 const fetchBtn = document.getElementById("fetch-btn") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLDivElement;
@@ -9,63 +11,70 @@ const listEl = document.getElementById("story-list") as HTMLDivElement;
 function formatRelativeTime(epochSec: number): string {
   const delta = Math.floor(Date.now() / 1000) - epochSec;
   if (delta < 60) return "just now";
-  if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
-  if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
-  return `${Math.floor(delta / 86400)}d ago`;
+  if (delta < 3600) return `${Math.floor(delta / 60)} minutes ago`;
+  if (delta < 86400) return `${Math.floor(delta / 3600)} hours ago`;
+  return `${Math.floor(delta / 86400)} days ago`;
 }
 
 function renderStories(stories: AgentStory[]): void {
   listEl.replaceChildren();
   emptyEl.textContent = "";
 
-  stories.forEach((s, i) => {
-    const row = document.createElement("div");
-    row.className = "story-row";
+  for (let i = 0; i < stories.length; i++) {
+    const s = stories[i];
 
-    // Rank
+    // Row 1: rank + title + (domain)
+    const athing = document.createElement("div");
+    athing.className = "story-athing";
+
     const rank = document.createElement("span");
     rank.className = "story-rank";
-    rank.textContent = String(i + 1);
+    rank.textContent = `${i + 1}.`;
 
-    // Body
-    const body = document.createElement("div");
-    body.className = "story-body";
-
-    // Title line
-    const titleDiv = document.createElement("div");
-    titleDiv.className = "story-title";
+    const titleline = document.createElement("span");
+    titleline.className = "story-titleline";
 
     const link = document.createElement("a");
     link.href = `https://news.ycombinator.com/item?id=${s.id}`;
     link.target = "_blank";
     link.rel = "noopener";
     link.textContent = s.title;
-    titleDiv.appendChild(link);
+    titleline.appendChild(link);
 
-    // Domain span
-    const domain = document.createElement("span");
-    domain.style.cssText = "color:var(--text-dim);font-size:10px;margin-left:6px";
-    domain.textContent = `(${s.domain})`;
-    titleDiv.appendChild(domain);
+    if (s.domain) {
+      const domainSpan = document.createElement("span");
+      domainSpan.className = "story-domain";
+      domainSpan.textContent = `(${s.domain})`;
+      titleline.appendChild(domainSpan);
+    }
 
-    // Meta
-    const meta = document.createElement("div");
-    meta.className = "story-meta";
-    meta.textContent = `${s.hnScore} pts \u00B7 ${s.by} \u00B7 ${s.descendants} comments \u00B7 ${formatRelativeTime(s.time)}`;
+    if (s.topCategory) {
+      const pill = document.createElement("span");
+      pill.className = "story-category";
+      pill.textContent = categoryMap[s.topCategory]?.label ?? s.topCategory;
+      titleline.appendChild(pill);
+    }
 
-    body.appendChild(titleDiv);
-    body.appendChild(meta);
+    athing.appendChild(rank);
+    athing.appendChild(titleline);
+    listEl.appendChild(athing);
 
-    // Score
-    const score = document.createElement("span");
-    score.className = "story-score";
-    score.textContent = Math.round(s.tasteScore * 100).toString();
+    // Row 2: subtext (points, author, time, comments) + taste score
+    const subtext = document.createElement("div");
+    subtext.className = "story-subtext";
 
-    row.appendChild(rank);
-    row.appendChild(body);
-    row.appendChild(score);
-    listEl.appendChild(row);
-  });
+    const subline = document.createElement("span");
+    subline.className = "story-subline";
+    subline.textContent = `${s.hnScore} points by ${s.by} ${formatRelativeTime(s.time)} | ${s.descendants} comments`;
+
+    const taste = document.createElement("span");
+    taste.className = "story-taste";
+    taste.textContent = `${Math.round(s.tasteScore * 100)}`;
+
+    subtext.appendChild(subline);
+    subtext.appendChild(taste);
+    listEl.appendChild(subtext);
+  }
 }
 
 async function fetchFeed(): Promise<void> {
@@ -85,15 +94,20 @@ async function fetchFeed(): Promise<void> {
       return;
     }
 
-    statusEl.textContent = `Done \u2014 ${resp.stories.length} stories scored in ${resp.elapsed.toFixed(1)}s`;
+    const sec = (resp.elapsed / 1000).toFixed(1);
+    statusEl.textContent = `${resp.stories.length} stories scored in ${sec}s`;
     renderStories(resp.stories);
   } catch (err) {
     statusEl.textContent = "";
-    emptyEl.textContent =
-      err instanceof Error ? err.message : "Unexpected error";
+    emptyEl.textContent = err instanceof Error ? err.message : "Unexpected error";
   } finally {
     fetchBtn.disabled = false;
   }
 }
+
+// Load category map for label resolution
+chrome.storage.local.get([STORAGE_KEYS.CATEGORY_MAP]).then((store) => {
+  categoryMap = (store[STORAGE_KEYS.CATEGORY_MAP] as CategoryMap) ?? {};
+});
 
 fetchBtn.addEventListener("click", fetchFeed);

@@ -1303,7 +1303,7 @@ chrome.runtime.onMessage.addListener(
             for (const e of embs) titleEmbeddings.push(l2Normalize(e));
           }
 
-          // 6. Score each via cosine similarity and build AgentStory[]
+          // 6. Score each via cosine similarity, rank category, build AgentStory[]
           const scored: AgentStory[] = valid.map((item, i) => {
             let domain = "";
             if (item.url) {
@@ -1311,6 +1311,7 @@ chrome.runtime.onMessage.addListener(
                 domain = new URL(item.url).hostname.replace(/^www\./, "");
               } catch { /* invalid URL — leave empty */ }
             }
+            const ranking = rankPresets(titleEmbeddings[i]);
             return {
               id: item.id,
               title: item.title!.trim(),
@@ -1321,14 +1322,15 @@ chrome.runtime.onMessage.addListener(
               time: item.time ?? 0,
               descendants: item.descendants ?? 0,
               tasteScore: cosineSimilarity(titleEmbeddings[i], tasteVec),
+              topCategory: ranking?.top.anchor,
             };
           });
 
-          // 7. Sort by tasteScore descending, return top 50
+          // 7. Sort by tasteScore descending, return top 30
           scored.sort((a, b) => b.tasteScore - a.tasteScore);
-          const top50 = scored.slice(0, 50);
+          const top = scored.slice(0, 30);
           const elapsed = Math.round(performance.now() - t0);
-          return { stories: top50, elapsed };
+          return { stories: top, elapsed };
         })()
           .then((result) => sendResponse(result))
           .catch((err) => sendResponse({ stories: [], elapsed: 0, error: String(err) }));
