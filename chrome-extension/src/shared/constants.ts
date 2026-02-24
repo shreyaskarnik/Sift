@@ -102,6 +102,11 @@ export const MSG = {
 
   // Taste profile
   COMPUTE_TASTE_PROFILE: "COMPUTE_TASTE_PROFILE",
+
+  // Label manager
+  FETCH_PAGE_TITLE: "FETCH_PAGE_TITLE",
+  UPDATE_LABEL: "UPDATE_LABEL",
+  DELETE_LABEL: "DELETE_LABEL",
 } as const;
 
 /** Storage keys for chrome.storage.local */
