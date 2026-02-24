@@ -1,8 +1,9 @@
-<div align="center">
-
-![Sift logo](docs/assets/logo.png)
-
-</div>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="chrome-extension/public/icons/logo-dark.svg">
+    <img src="chrome-extension/public/icons/logo-light.svg" alt="Sift logo" width="220">
+  </picture>
+</p>
 
 # Sift
 
@@ -27,11 +28,9 @@ https://github.com/shreyaskarnik/Sift/raw/main/video-output/sift-demo.mp4
 
 ## At a Glance
 
-<div align="center">
-
-![Sift infographic: local scoring, supported sites, and training loop](docs/assets/sift-infographic.png)
-
-</div>
+<p align="center">
+  <img src="docs/assets/sift-infographic.svg" alt="Sift infographic: local scoring, supported sites, and training loop" width="100%">
+</p>
 
 ## How It Works
 
