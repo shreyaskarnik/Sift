@@ -700,7 +700,7 @@ interface PageScoreCacheEntry {
 
 const pageScoreCache = new Map<number, PageScoreCacheEntry>();
 const scoringInFlight = new Set<number>(); // dedupe concurrent scorePageTitle calls
-let pageScoringEnabled = false;
+let pageScoringEnabled = true;
 let activeTabId = -1;
 
 // Load initial state + bootstrap scoring if already enabled on wake
@@ -708,12 +708,15 @@ Promise.all([
   chrome.storage.local.get(STORAGE_KEYS.PAGE_SCORING_ENABLED),
   chrome.tabs.query({ active: true, currentWindow: true }),
 ]).then(([stored, tabs]) => {
-  pageScoringEnabled = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] === true;
+  pageScoringEnabled = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] !== false;
   if (tabs[0]?.id) activeTabId = tabs[0].id;
   // If enabled on wake and model is already loaded, score active tab.
   // If model isn't loaded yet, setAnchor() at end of loadModels() will trigger it.
   if (pageScoringEnabled && activeTabId > 0 && modelReady && anchorReady) {
     void scorePageTitle(activeTabId);
+  } else if (activeTabId > 0) {
+    // Show green dot on supported sites even when scoring is off
+    void updateSiteBadge(activeTabId);
   }
 });
 
@@ -742,7 +745,7 @@ function updateBadge(tabId: number, result: VibeResult | null): void {
   if (tabId !== activeTabId) return;
 
   if (!result || !pageScoringEnabled) {
-    chrome.action.setBadgeText({ text: "" });
+    clearBadge();
     return;
   }
 
@@ -755,9 +758,29 @@ function updateBadge(tabId: number, result: VibeResult | null): void {
   chrome.action.setBadgeBackgroundColor({ color });
 }
 
-/** Clear badge (e.g. when feature is disabled or on non-scorable page). */
-function clearBadge(): void {
+/** Show green site indicator when on a supported feed site (HN/Reddit/X). */
+async function updateSiteBadge(tabId: number): Promise<void> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.url) {
+      const host = new URL(tab.url).hostname;
+      if (isFeedScoredHost(host)) {
+        chrome.action.setBadgeText({ text: "✦" });
+        chrome.action.setBadgeBackgroundColor({ color: [52, 211, 153, 255] });
+        return;
+      }
+    }
+  } catch { /* tab gone */ }
   chrome.action.setBadgeText({ text: "" });
+}
+
+/** Clear score badge — falls back to green site indicator if on a supported site. */
+function clearBadge(): void {
+  if (activeTabId > 0) {
+    void updateSiteBadge(activeTabId);
+  } else {
+    chrome.action.setBadgeText({ text: "" });
+  }
 }
 
 /** Domains with content scripts already doing feed-level scoring. */
@@ -851,8 +874,14 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
 // --- Tab listeners (always registered, gated by pageScoringEnabled) ---
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (!pageScoringEnabled) return;
   if (changeInfo.status !== "complete") return;
+
+  if (!pageScoringEnabled) {
+    // Even with page scoring off, show green dot on supported sites
+    if (tabId === activeTabId) void updateSiteBadge(tabId);
+    return;
+  }
+
   if (!isScorableUrl(tab.url)) {
     // Evict stale cache from previous page on this tab
     pageScoreCache.delete(tabId);
@@ -866,7 +895,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   activeTabId = tabId;
   if (!pageScoringEnabled) {
-    clearBadge();
+    void updateSiteBadge(tabId);
     return;
   }
 
@@ -890,7 +919,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Listen for page scoring toggle changes
 chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.PAGE_SCORING_ENABLED]) {
-    pageScoringEnabled = changes[STORAGE_KEYS.PAGE_SCORING_ENABLED].newValue === true;
+    pageScoringEnabled = changes[STORAGE_KEYS.PAGE_SCORING_ENABLED].newValue !== false;
     if (!pageScoringEnabled) {
       // Disable: clear all badges and cache
       pageScoreCache.clear();

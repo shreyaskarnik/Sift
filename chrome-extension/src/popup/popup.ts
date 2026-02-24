@@ -484,7 +484,7 @@ async function init() {
   toggleReddit.checked = sites.reddit !== false;
   toggleX.checked = sites.x !== false;
 
-  togglePageScore.checked = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] === true;
+  togglePageScore.checked = stored[STORAGE_KEYS.PAGE_SCORING_ENABLED] !== false;
 
   // Get model status
   try {
@@ -521,6 +521,18 @@ async function init() {
   agentLink?.addEventListener("click", (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: chrome.runtime.getURL("agent.html") });
+  });
+
+  // Pin hint — show once
+  const pinHint = document.getElementById("pin-hint")!;
+  const pinDismiss = document.getElementById("pin-hint-dismiss")!;
+  const pinStored = await chrome.storage.local.get("pin_hint_dismissed");
+  if (!pinStored["pin_hint_dismissed"]) {
+    pinHint.style.display = "flex";
+  }
+  pinDismiss.addEventListener("click", () => {
+    pinHint.style.display = "none";
+    chrome.storage.local.set({ pin_hint_dismissed: true });
   });
 
   // Auto-compute on first fold open if no cached data or stale
