@@ -1154,6 +1154,7 @@ chrome.runtime.onMessage.addListener(
             found = true;
 
             const label = labels[idx];
+            const anchorBefore = label.anchor;
             if (updates.text !== undefined) label.text = updates.text;
             if (updates.label !== undefined) label.label = updates.label;
             // Always store diagnostic auto-fields if available
@@ -1170,7 +1171,12 @@ chrome.runtime.onMessage.addListener(
               }
             }
 
-            labels[idx] = stampAnchorText(label, currentCategoryMap);
+            // Only re-stamp anchorText when anchor actually changed —
+            // preserve historical anchorText for training data integrity
+            if (label.anchor !== anchorBefore) {
+              stampAnchorText(label, currentCategoryMap);
+            }
+            labels[idx] = label;
             return labels;
           });
           sendResponse({ success: found });

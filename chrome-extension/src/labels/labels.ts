@@ -52,10 +52,11 @@ let activeIds: string[] = [];
 let addPolarity: "positive" | "negative" | null = null;
 let addRanking: PresetRanking | undefined;
 
-/** Sends a message and throws if the response contains an error field. */
+/** Sends a message and throws if the response signals failure. */
 async function sendMsg(msg: { type: string; payload?: unknown }): Promise<Record<string, unknown>> {
   const resp = (await chrome.runtime.sendMessage(msg)) as Record<string, unknown>;
   if (resp?.error) throw new Error(String(resp.error));
+  if ("success" in resp && !resp.success) throw new Error("No matching label found");
   return resp;
 }
 
