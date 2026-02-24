@@ -25,9 +25,28 @@ Thumbs.db
 video-frames/
 .video-chrome-profile/
 
+# Python build
+build/
+dist/
+*.whl
+*.tar.gz
+
 # Env / secrets
 .env
-.env.local
+.env.*
+
+# Certificates / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
 
 # Private drafts
 linkedin-announcement.md
