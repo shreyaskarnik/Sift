@@ -30,6 +30,7 @@ import {
   mkdirSync,
   existsSync,
   readdirSync,
+  readFileSync,
   rmSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
@@ -91,12 +92,12 @@ function getArg(name, fallback) {
   return idx >= 0 && args[idx + 1] ? args[idx + 1] : fallback;
 }
 const OUT = getArg("out", join(ROOT, "video-output", "sift-demo.webm"));
-const FPS = Number(getArg("fps", "1"));
+const FPS = Number(getArg("fps", "2"));
 const WIDTH = Number(getArg("width", "1280"));
 const HEIGHT = Number(getArg("height", "800"));
 const SCALE = Number(getArg("scale", "2"));
-const HOLD_SEC = Number(getArg("hold", "3"));
-const TITLE_HOLD_SEC = Number(getArg("title-hold", "4"));
+const HOLD_SEC = Number(getArg("hold", "2.5"));
+const TITLE_HOLD_SEC = Number(getArg("title-hold", "3"));
 
 // Pixel dimensions for frames (retina)
 const PX_W = WIDTH * SCALE;
@@ -118,7 +119,10 @@ function holdFrame(sourcePath, seconds) {
 }
 
 // ─── Title card HTML ────────────────────────────────────────────────────────
-function titleCardHTML(title, subtitle) {
+const LOGO_PATH = join(ROOT, "docs", "assets", "logo.png");
+const LOGO_DATA_URI = `data:image/png;base64,${readFileSync(LOGO_PATH).toString("base64")}`;
+
+function titleCardHTML(title, subtitle, { logo = false } = {}) {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -140,6 +144,12 @@ function titleCardHTML(title, subtitle) {
       font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
       overflow: hidden;
     }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+    }
     .title {
       font-size: 48px;
       font-weight: 700;
@@ -160,6 +170,7 @@ function titleCardHTML(title, subtitle) {
   </style>
 </head>
 <body>
+  ${logo ? `<img class="logo" src="${LOGO_DATA_URI}" />` : ""}
   <div class="title">${title}</div>
   ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ""}
 </body>
@@ -217,7 +228,7 @@ function screenshotPageHTML(imagePath, annotation) {
 </head>
 <body>
   <div class="img-container">
-    <img src="file://${imagePath}" />
+    <img src="data:image/png;base64,${readFileSync(imagePath).toString("base64")}" />
   </div>
   ${annotation ? `<div class="annotation">${annotation}</div>` : ""}
 </body>
@@ -233,7 +244,6 @@ function screenshotPageHTML(imagePath, annotation) {
  */
 function buildScenes() {
   const ss = (file) => join(SCREENSHOTS_DIR, file);
-  const totalSteps = 8;
 
   return [
     // ── Intro ──
@@ -242,13 +252,15 @@ function buildScenes() {
       html: titleCardHTML(
         '<span class="accent">Sift</span>',
         "Score your feed with EmbeddingGemma, right in the browser.",
+        { logo: true },
       ),
-      hold: TITLE_HOLD_SEC + 1,
+      hold: TITLE_HOLD_SEC,
     },
     {
       type: "html",
       file: ss("embedding-diagram-dark.html"),
-      hold: TITLE_HOLD_SEC + 2,
+      animationSec: 2.5,
+      hold: HOLD_SEC,
     },
     {
       type: "title",
@@ -259,134 +271,116 @@ function buildScenes() {
       hold: TITLE_HOLD_SEC,
     },
 
-    // ── Step 1: HN scoring + dimming ──
+    // ── Before / After ──
     {
-      type: "title",
-      html: titleCardHTML(
-        "In-Browser Scoring",
-        "EmbeddingGemma-300M (q4) runs entirely in your browser via WebGPU.",
-      ),
-      hold: TITLE_HOLD_SEC,
+      type: "screenshot",
+      file: ss("hn-before.png"),
+      annotation: "Hacker News — before Sift",
+      hold: HOLD_SEC,
     },
     {
       type: "screenshot",
-      file: ss("hn-scored.png"),
-      annotation: "Hacker News — low-relevance posts dimmed, high-relevance stay bright",
-      hold: HOLD_SEC + 2,
-    },
-
-    // ── Step 2: Score inspector ──
-    {
-      type: "title",
-      html: titleCardHTML(
-        'The "?" Inspector',
-        "Deterministic score explanation — no LLM call required.",
-      ),
-      hold: TITLE_HOLD_SEC,
-    },
-    {
-      type: "screenshot",
-      file: ss("hn-inspector.png"),
-      annotation: 'Click "?" → score band, category pills, and rationale',
+      file: ss("hn-after.png"),
+      annotation: "After — low-relevance dimmed, scores + inspector + labels visible",
       hold: HOLD_SEC + 1,
     },
 
-    // ── Step 3: Label items ──
+    // ── Popup ──
     {
       type: "title",
       html: titleCardHTML(
-        "Label As You Browse",
-        "Thumbs up/down to collect training data — stays local.",
-      ),
-      hold: TITLE_HOLD_SEC,
-    },
-    {
-      type: "screenshot",
-      file: ss("hn-labels.png"),
-      annotation: "Label items with 👍👎 — data stays in the extension",
-      hold: HOLD_SEC + 1,
-    },
-
-    // ── Step 4: Category pills ──
-    {
-      type: "title",
-      html: titleCardHTML(
-        "25 Built-in Categories",
-        "AI Research, Startups, Deep Tech, Open Source, and more.",
-      ),
-      hold: TITLE_HOLD_SEC,
-    },
-    {
-      type: "screenshot",
-      file: ss("popup-categories.png"),
-      annotation: "Toggle categories on/off to shape your scoring lens",
-      hold: HOLD_SEC + 1,
-    },
-
-    // ── Step 5: Popup ──
-    {
-      type: "title",
-      html: titleCardHTML(
-        "Extension Popup",
-        "Settings, categories, taste profile, and training data — all in one place.",
+        "The Popup",
+        "Page score, category pills, 25 built-in categories, taste profile, training data.",
       ),
       hold: TITLE_HOLD_SEC,
     },
     {
       type: "screenshot",
       file: ss("popup.png"),
-      hold: HOLD_SEC + 2,
+      annotation: "WebGPU inference · 23/25 categories active · 76 labels collected",
+      hold: HOLD_SEC + 1,
     },
 
-    // ── Step 6: Three sites ──
+    // ── Works everywhere ──
     {
       type: "title",
       html: titleCardHTML(
-        "Three Sites, One Model",
-        "Hacker News · Reddit · X — same categories, same model, consistent scoring.",
+        "Works Wherever You Read",
+        "Same model, same categories — consistent scoring on any page.",
       ),
       hold: TITLE_HOLD_SEC,
     },
     {
       type: "screenshot",
-      file: ss("reddit-scored.png"),
-      annotation: "Reddit — scored and dimmed by Sift",
-      hold: HOLD_SEC + 1,
+      file: ss("reddit.png"),
+      annotation: "Reddit",
+      hold: HOLD_SEC,
     },
     {
       type: "screenshot",
-      file: ss("x-scored.png"),
-      annotation: "X — scored and dimmed by Sift",
-      hold: HOLD_SEC + 1,
+      file: ss("x.png"),
+      annotation: "X",
+      hold: HOLD_SEC,
     },
     {
       type: "screenshot",
       file: ss("techcrunch.png"),
-      annotation: "TechCrunch — browse any site with Sift",
+      annotation: "TechCrunch",
+      hold: HOLD_SEC,
+    },
+
+    // ── Taste Profile ──
+    {
+      type: "title",
+      html: titleCardHTML(
+        "Taste Profile",
+        "After labeling 10+ items, Sift builds a contrastive profile of your interests.",
+      ),
+      hold: TITLE_HOLD_SEC,
+    },
+    {
+      type: "screenshot",
+      file: ss("taste.png"),
+      annotation: "Radar chart + ranked probes — your top interests by affinity",
       hold: HOLD_SEC + 1,
     },
 
-    // ── Step 7: Training loop ──
+    // ── Label Manager + Training Loop ──
+    {
+      type: "title",
+      html: titleCardHTML(
+        "Curate &amp; Train",
+        "Label Manager for filtering, editing, and category reassignment.<br>Then fine-tune.",
+      ),
+      hold: TITLE_HOLD_SEC,
+    },
+    {
+      type: "screenshot",
+      file: ss("label-manager.png"),
+      annotation: "Filter by category/polarity/source · inline edit · reassign categories",
+      hold: HOLD_SEC + 1,
+    },
     {
       type: "title",
       html: titleCardHTML(
         "The Training Loop",
         `<div style="text-align:left; max-width:600px; margin:0 auto;">
           <div style="margin:6px 0;">1. 👍👎 Label items as you browse</div>
-          <div style="margin:6px 0;">2. 📤 Export labels as training CSV</div>
-          <div style="margin:6px 0;">3. 🧪 Fine-tune in Colab or locally</div>
-          <div style="margin:6px 0;">4. 🚀 Load fine-tuned model back into the extension</div>
+          <div style="margin:6px 0;">2. 🗂️ Curate in the Label Manager</div>
+          <div style="margin:6px 0;">3. 📤 Export as training CSV</div>
+          <div style="margin:6px 0;">4. 🧪 Fine-tune in Colab or locally</div>
+          <div style="margin:6px 0;">5. 🚀 Load fine-tuned model back into Sift</div>
         </div>`,
       ),
-      hold: TITLE_HOLD_SEC + 2,
+      hold: TITLE_HOLD_SEC + 1,
     },
 
-    // ── Step 8: Privacy ──
+    // ── Privacy ──
     {
       type: "title",
       html: titleCardHTML(
         "Privacy-First",
-        "No backend. No data leaves your browser.<br>Inference + labels stay local.",
+        "No backend. No API costs. Inference stays local.",
       ),
       hold: TITLE_HOLD_SEC,
     },
@@ -400,8 +394,9 @@ function buildScenes() {
         <span style="font-family: JetBrains Mono, monospace; font-size: 16px; color: #4e5058;">
           github.com/shreyaskarnik/Sift
         </span>`,
+        { logo: true },
       ),
-      hold: TITLE_HOLD_SEC + 2,
+      hold: TITLE_HOLD_SEC + 1,
     },
   ];
 }
@@ -429,14 +424,14 @@ async function main() {
     mkdirSync(SCREENSHOTS_DIR, { recursive: true });
     console.log(`\n📁 Created ${SCREENSHOTS_DIR}/`);
     console.log("   Place your screenshots there and re-run. Expected files:");
-    console.log("     hn-scored.png       — HN with scoring + dimming visible");
-    console.log("     hn-inspector.png    — HN with \"?\" inspector tooltip open");
-    console.log("     hn-labels.png       — HN with thumbs up/down buttons visible");
-    console.log("     popup-categories.png — Popup with categories fold expanded");
+    console.log("     hn-before.png       — Raw HN feed (no Sift)");
+    console.log("     hn-after.png        — HN with scoring + dimming + inspector");
     console.log("     popup.png           — Full popup screenshot");
-    console.log("     reddit-scored.png   — Reddit with scoring + dimming");
-    console.log("     x-scored.png        — X/Twitter with scoring + dimming");
-    console.log("     techcrunch.png      — TechCrunch article page");
+    console.log("     reddit.png          — Reddit with scoring + inspector");
+    console.log("     x.png              — X/Twitter with scoring + inspector");
+    console.log("     techcrunch.png      — TechCrunch article with Sift popup");
+    console.log("     taste.png           — Taste Profile page with radar chart");
+    console.log("     label-manager.png   — Label Manager page");
     process.exit(0);
   }
 
@@ -527,11 +522,17 @@ async function main() {
           waitUntil: "networkidle",
           timeout: 15000,
         });
-        // Wait for fonts + CSS animations to settle
-        await renderPage.waitForTimeout(2000);
-        const path = framePath();
-        await renderPage.screenshot({ path, type: "png" });
-        holdFrame(path, scene.hold || HOLD_SEC);
+        await renderPage.waitForTimeout(1500); // settle fonts + rAF
+        // Capture multiple frames to show continuous animation (flowing arrows, pulsing glow)
+        const holdMs = (scene.hold || HOLD_SEC) * 1000;
+        const captureInterval = 500 / FPS; // one capture per video frame
+        const numCaptures = Math.max(1, Math.round(holdMs / (1000 / FPS)));
+        for (let c = 0; c < numCaptures; c++) {
+          await renderPage.waitForTimeout(1000 / FPS);
+          const p = framePath();
+          await renderPage.screenshot({ path: p, type: "png" });
+          if (c < numCaptures - 1) frameIndex++;
+        }
         frameIndex++;
         break;
       }

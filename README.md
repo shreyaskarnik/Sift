@@ -17,6 +17,14 @@ On supported sites, Sift dims low-relevance items so the good stuff stands out.
 
 Users can label items (thumbs up/down) to collect training data, export it as CSV, and fine-tune the model with the included Python pipeline.
 
+## Demo
+
+<div align="center">
+
+https://github.com/shreyaskarnik/Sift/raw/main/video-output/sift-demo.mp4
+
+</div>
+
 ## At a Glance
 
 <div align="center">

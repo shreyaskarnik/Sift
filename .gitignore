@@ -28,3 +28,6 @@ video-frames/
 # Env / secrets
 .env
 .env.local
+
+# Private drafts
+linkedin-announcement.md

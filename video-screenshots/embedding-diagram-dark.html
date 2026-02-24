@@ -177,6 +177,12 @@
     text-align: center;
     position: relative;
     box-shadow: 0 0 40px rgba(74, 158, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+    animation: boxGlow 3s ease-in-out infinite;
+  }
+
+  @keyframes boxGlow {
+    0%, 100% { box-shadow: 0 0 40px rgba(74, 158, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.04); }
+    50% { box-shadow: 0 0 60px rgba(74, 158, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.06); }
   }
   .model-box::before {
     content: '';
@@ -381,13 +387,12 @@
   .vector-card:nth-child(4) { animation-delay: 0.25s; }
 
   .glowing-path {
-    stroke-dasharray: 400;
-    stroke-dashoffset: 400;
-    animation: drawLine 1.2s ease forwards;
+    stroke-dasharray: 16 8;
+    animation: flowDash 1.8s linear infinite;
   }
 
-  @keyframes drawLine {
-    to { stroke-dashoffset: 0; }
+  @keyframes flowDash {
+    to { stroke-dashoffset: -24; }
   }
 
   .bottom-row {
