@@ -21,9 +21,8 @@ chrome-extension/dist/
 .DS_Store
 Thumbs.db
 
-# Video generation
+# Video generation (intermediate)
 video-frames/
-video-output/
 .video-chrome-profile/
 
 # Env / secrets
