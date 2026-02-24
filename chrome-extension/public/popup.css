@@ -213,6 +213,30 @@ body {
   font-size: 0;
 }
 
+/* ── Agent Button ── */
+
+.agent-btn {
+  display: block;
+  text-align: center;
+  padding: 7px 0;
+  margin-bottom: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.agent-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* ── Folds ── */
 
 .fold {

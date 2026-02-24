@@ -517,6 +517,12 @@ async function init() {
     chrome.tabs.create({ url: chrome.runtime.getURL("labels.html") });
   });
 
+  const agentLink = document.getElementById("agent-link");
+  agentLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL("agent.html") });
+  });
+
   // Auto-compute on first fold open if no cached data or stale
   const tasteFold = document.querySelector(".fold-taste") as HTMLDetailsElement;
   tasteFold.addEventListener("toggle", () => {
