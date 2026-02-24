@@ -60,7 +60,14 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - Light/dark mode (follows system)
 - Custom model URL for testing local fine-tuned models
 
-### Build
+### Install
+
+1. Download the latest `sift-*.zip` from [Releases](https://github.com/nickcdryan/embeddinggemma-tuning-lab/releases)
+2. Unzip the file
+3. Open `chrome://extensions`, enable **Developer Mode**
+4. Click **Load unpacked** and select the `dist/` folder
+
+### Build from source
 
 ```bash
 cd chrome-extension
@@ -68,7 +75,7 @@ npm install
 npm run build
 ```
 
-Load `chrome-extension/dist/` as an unpacked extension in `chrome://extensions`.
+Then load `chrome-extension/dist/` as an unpacked extension in `chrome://extensions`.
 
 ## Publishing Fine-tuned Models
 

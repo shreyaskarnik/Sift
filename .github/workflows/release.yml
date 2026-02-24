@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: chrome-extension/package-lock.json
+
+      - name: Install and build
+        run: cd chrome-extension && npm ci && npm run build
+
+      - name: Zip extension
+        run: cd chrome-extension && zip -r ../sift-${GITHUB_REF_NAME}.zip dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sift-${{ github.ref_name }}.zip
+          generate_release_notes: true
