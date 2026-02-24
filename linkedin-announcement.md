@@ -1,44 +1,47 @@
-# LinkedIn Announcement Post (Option B — Storytelling)
+# LinkedIn Announcement Post (Shipped + Near-Term Prototype)
 
-**Every morning I'd open Hacker News, Reddit, and X — and spend 20 minutes scrolling past things I don't care about to find the 3 things I do.**
+Every morning I'd open Hacker News, Reddit, and X and spend 20 minutes digging for the 3 things I actually cared about.
 
 So I built Sift.
 
-It's a Chrome extension that runs an embedding model (EmbeddingGemma-300M, quantized to 4-bit) directly in your browser. No server, no account, no data collection.
+Sift is a Chrome extension that runs EmbeddingGemma-300M (q4) in your browser to score feed items against your active interests and fade low-relevance posts.
 
-When you load a feed, Sift scores every item against 25 interest categories — AI Research, Startups, Climate, Politics, whatever you've turned on. Items that don't match your interests fade to near-transparent. Items that do stay vivid.
+Shipped today:
+- In-browser scoring on Hacker News, Reddit, and X
+- Deterministic "?" inspector for score explanations (no LLM call)
+- Thumbs up/down labeling while browsing
+- Label export as triplet CSV for training
+- Taste Profile with interactive radar chart
+- Label Manager for filtering, edits, category reassignment, and URL-based label add
 
-The "aha" moment for me was the training loop. You can:
-- Label items with thumbs up/down as you browse
-- Curate your labels in a full Label Manager — inline edit text, flip polarity, reassign categories, add labels manually by pasting a URL (it auto-fetches the title and suggests the best category)
-- Export those labels as training triplets
-- Fine-tune the model on your personal preferences (one click in a free Colab notebook, or locally)
-- Load the fine-tuned model back into the extension — with full WebGPU acceleration
+Training loop:
+1. Label while browsing
+2. Export CSV
+3. Fine-tune in Colab or locally
+4. Reload your model in the extension
 
-After ~50 labels and one training run, the difference is striking. The model stops being generic and starts reflecting *you*.
+WebGPU when available, WASM fallback.
 
-There's also an inspector (press "?" on any item) that explains scores deterministically — no LLM call, no cost, instant.
+Near-term prototype:
+I'm testing an Agent mode that fetches and ranks top HN stories by your taste vector.
 
-And a Taste Profile with an interactive radar chart — a visual map of your interests across all categories. Click any axis to drill into that category's sub-topics. It reveals preferences you didn't even know you had: "You prefer open-source ML frameworks over enterprise SaaS" or "You engage more with climate policy than climate science."
+Privacy model:
+No backend collecting your feed behavior; inference + labels stay local.
 
-I'm also prototyping an agent mode — press a button, and Sift fetches the top 30 Hacker News stories ranked by your personal taste vector. No scrolling required. Your own relevance-ranked front page, powered by a model that knows what you care about.
-
-Everything runs client-side. Your labels, your model, your data — all yours.
-
-Built with @Hugging Face Transformers.js, @Google EmbeddingGemma, and @Google Chrome Extensions MV3.
+Built with Transformers.js, EmbeddingGemma, Chrome Extensions MV3, and ONNX tooling.
 
 [link to repo]
 
 #BuildInPublic #AI #Privacy #ChromeExtension #OpenSource
 
-### Companies to tag on LinkedIn:
-- **Hugging Face** — Transformers.js runtime + model hosting (HF Hub)
-- **Google** — EmbeddingGemma model + Chrome platform + Colab notebooks
-- **Google Chrome** — Chrome Extensions / MV3 platform
-- **ONNX Runtime / Microsoft** — ONNX model format + quantization tooling
-- **Y Combinator / Hacker News** — one of the three supported feeds
-- **Reddit** — one of the three supported feeds
-- **X (Twitter)** — one of the three supported feeds
+### Companies to tag on LinkedIn
+- Hugging Face - Transformers.js runtime + model hosting
+- Google - EmbeddingGemma model + Colab
+- Google Chrome - Chrome Extensions / MV3 platform
+- Microsoft / ONNX Runtime - ONNX format + runtime tooling
+- Y Combinator / Hacker News - one supported feed source
+- Reddit - one supported feed source
+- X (Twitter) - one supported feed source
 
 ---
 
@@ -46,120 +49,111 @@ Built with @Hugging Face Transformers.js, @Google EmbeddingGemma, and @Google Ch
 
 ## Standard Post (280 characters)
 
-I built a Chrome extension that runs a 300M-param AI model in your browser to filter HN, Reddit, and X feeds.
+Built Sift: a Chrome extension that ranks HN, Reddit, and X using EmbeddingGemma in-browser.
 
-No server. No data leaves your device.
+No backend collecting your feed behavior; inference + labels stay local.
 
-Label items → fine-tune on free Colab → reload with WebGPU. It learns YOUR taste.
+Train in Colab/local, reload your model. WebGPU when available, WASM fallback.
 
-Open source: [link]
+OSS: [link]
 
 ## Thread Version (for more reach)
 
 **Tweet 1 (hook):**
-I built a Chrome extension that runs a 300M-parameter embedding model entirely in your browser to filter your feeds.
+I built Sift, a Chrome extension that runs EmbeddingGemma in-browser to rank Hacker News, Reddit, and X.
 
-No server. No login. Your data never leaves your device.
-
-It's called Sift. Here's how it works:
+No backend collecting your feed behavior; inference + labels stay local.
 
 **Tweet 2 (how it works):**
-When you load Hacker News, Reddit, or X — Sift scores every item against your interest categories using EmbeddingGemma (quantized to ~50MB).
+Open HN, Reddit, or X and Sift scores each item against your active categories.
 
-Low-relevance items fade out. High-relevance items stay bright.
+Low-relevance posts fade, high-relevance posts stay vivid.
 
-25 built-in categories: AI Research, Startups, Climate, Politics, etc.
+25 built-in categories right now.
 
-**Tweet 3 (the training loop):**
-But the real magic is the training loop:
+**Tweet 3 (training loop):**
+Training loop:
+1) Thumb up/down while browsing
+2) Curate in Label Manager
+3) Export CSV -> fine-tune in Colab/local
+4) Reload model in extension
 
-1. Thumbs up/down items as you browse
-2. Curate in the Label Manager — edit, filter, add labels by URL
-3. Export → fine-tune on free Colab T4 → reload with WebGPU
+WebGPU when available, WASM fallback.
 
-~50 labels and one training run — the model starts reflecting YOU.
+**Tweet 4 (taste + prototype):**
+Also shipped: Taste Profile with an interactive radar chart.
 
-**Tweet 4 (taste profile + agent mode):**
-There's a Taste Profile with an interactive radar chart — a visual map of your interests. Click any axis to drill in.
-
-Plus an experimental agent mode — press a button, get the top 30 HN stories ranked by YOUR taste vector. Your own relevance-ranked front page.
+Near-term prototype: Agent mode for HN that fetches and ranks top stories by your taste vector.
 
 **Tweet 5 (CTA):**
-Stack: TypeScript, Chrome MV3, @huggingface Transformers.js, @Google EmbeddingGemma, ONNX quantization, WebGPU
+Stack: TypeScript, Chrome MV3, Transformers.js, EmbeddingGemma, ONNX, WebGPU.
 
-Training pipeline: Python + Colab notebook included
+Open source + training notebook: [link]
 
-Everything is open source: [link]
-
-### Companies/accounts to tag on X:
-- **@huggingface** — Transformers.js, model hub
-- **@Google** — EmbeddingGemma model
-- **@GoogleChrome** — Chrome Extensions platform
-- **@onnxruntime** — ONNX model format
-- **@GoogleColab** — training notebook environment
+### Companies/accounts to tag on X
+- @huggingface - Transformers.js and model hub
+- @Google - EmbeddingGemma
+- @GoogleChrome - Chrome Extensions platform
+- @onnxruntime - ONNX runtime/tooling
+- @GoogleColab - notebook training environment
 
 ---
 
 # Video Demo Ideas
 
-## 1. "Before & After" Side-by-Side (60–90 seconds)
-- **Left panel**: Raw Hacker News / Reddit feed — wall of undifferentiated links
-- **Right panel**: Same feed with Sift active — low-relevance items faded, high-relevance items bright
-- **Narration**: "This is what my feed looks like without Sift. And this is with it."
-- **End with**: toggling categories on/off and watching scores shift in real-time
+## 1. "Before & After" Side-by-Side (60-90 seconds)
+- Left panel: Raw Hacker News or Reddit feed
+- Right panel: Same feed with Sift active
+- Narration: "Without Sift vs with Sift"
+- End with category toggles and live score shifts
 
-## 2. "The Full Loop" Walkthrough (2–3 minutes)
-Show the end-to-end workflow:
-1. **Install & configure** — select your interest categories
-2. **Browse HN** — watch items get scored, show the opacity dimming
-3. **Press "?"** — show the inspector explaining *why* an item scored the way it did
-4. **Thumbs up/down** — label 5-10 items live
-5. **Label Manager** — open it, show filters, inline edit a label, add one by URL
-6. **Export CSV** — show the triplet format
-7. **Run training** — Colab notebook or terminal, show the Taste Check metrics (before→after)
-8. **Reload model** — paste custom model URL, show scores improve with WebGPU
-9. **Taste Profile** — show the radar chart, click a category to filter, scroll through ranked probes
+## 2. "The Full Loop" Walkthrough (2-3 minutes)
+Show end-to-end workflow:
+1. Install and configure categories
+2. Browse HN and show scoring/dimming
+3. Press "?" and show deterministic explanation
+4. Label 5-10 items with thumbs
+5. Open Label Manager and edit/reassign one label
+6. Export CSV
+7. Run training in Colab or terminal
+8. Reload model and compare behavior
+9. Open Taste Profile and click radar axes
 
-## 3. "Privacy Proof" Demo (60 seconds)
+## 3. "Privacy Model" Demo (60 seconds)
 - Open Chrome DevTools Network tab
 - Browse with Sift active
-- Show that **zero network requests** go to any external server
-- The model loads once from a CDN/local, then everything is local inference
-- "Your reading habits never leave your machine."
+- Show no calls to a Sift-owned backend for feed behavior (there is none)
+- Clarify what traffic still exists: target sites + model/download endpoints
+- "Personalization happens locally in the extension."
 
-## 4. "Three Sites, One Brain" (45 seconds)
-Quick cuts between:
-- **Hacker News** — tech items scored
-- **Reddit** — subreddit posts scored
-- **X/Twitter** — tweets scored
-- Same categories, same model, consistent scoring across platforms
-- "One model. Three feeds. Your interests, everywhere."
+## 4. "Three Sites, One Model" (45 seconds)
+Quick cuts:
+- Hacker News
+- Reddit
+- X/Twitter
+- Same categories, same model, consistent scoring pattern
 
-## 5. "Taste Profile Reveal" (30–45 seconds, good for a short-form clip)
-- Open the Taste Profile page cold — the radar chart animates in
-- Hover over axes to see per-category stats (score, label counts, last labeled time)
-- Click a category axis to filter — the probe bars below update instantly
-- Scroll through ranked sub-topic probes with color-coded score bars
-- "I didn't know I cared more about distributed systems than frontend frameworks until Sift showed me."
+## 5. "Taste Profile Reveal" (30-45 seconds)
+- Open Taste Profile page
+- Show radar chart and axis click-to-filter
+- Scroll ranked probes
+- Close with one concrete insight example
 
-## 6. "Label Manager: Curate Your Training Data" (45–60 seconds)
-- Open Label Manager from the popup
-- Show the filterable table — filter by category, polarity, source
-- Click a label's text to inline edit it
-- Click the category pill to reassign to a different category
-- Paste a URL into "Add label", watch it auto-fetch the title and suggest a category
-- "You're not just labeling — you're curating the dataset that teaches your model what matters to you."
+## 6. "Label Manager: Curate Training Data" (45-60 seconds)
+- Open Label Manager from popup
+- Filter by category/polarity/source
+- Inline edit label text
+- Reassign category
+- Paste URL and show title fetch + category suggestion
 
-## 7. "Agent Mode: Your Personal HN" (30–45 seconds, good for a teaser clip)
-- Open the agent page
-- Press "Fetch my stories"
-- Watch the top 30 HN stories populate, ranked by taste score
-- Each story has a category pill showing why it matched
-- "Instead of scrolling through 500 HN posts, I get my top 30 in one click."
+## 7. "Agent Mode Teaser" (30-45 seconds)
+- Position it as near-term prototype
+- Show fetch/rank flow on top HN stories
+- Highlight "your personal relevance-ranked front page"
 
 ## 8. Screen Recording Tips
-- Use a clean browser profile with just Sift installed
-- Pre-load some labeled data so the Taste Profile is populated
-- Record at 1080p or higher, crop to the browser window
-- For the training step, speed up the terminal output (2-4x) with a progress bar visible
-- Add simple text overlays for each step rather than heavy narration
+- Use a clean browser profile with only Sift installed
+- Pre-load labeled data for the Taste Profile section
+- Record at 1080p+
+- Speed up long training output (2-4x)
+- Use lightweight text overlays for each section
