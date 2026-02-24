@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embedding Model – Dark Mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0f11;
+    --surface: #181a1e;
+    --surface2: #1e2025;
+    --surface3: #262830;
+    --border: #2a2d35;
+    --border2: #363940;
+    --text: #e4e5e7;
+    --text-muted: #7a7d85;
+    --blue: #4a9eff;
+    --blue-dim: #1e4b8a;
+    --green: #34d399;
+    --green-dim: #0d4a38;
+    --green-bright: #5ef7c8;
+    --teal: #38d4c8;
+    --accent: #f0b849;
+    --glow-blue: rgba(74, 158, 255, 0.15);
+    --glow-green: rgba(52, 211, 153, 0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 20% 50%, rgba(30, 75, 138, 0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 80% 50%, rgba(13, 74, 56, 0.06) 0%, transparent 70%);
+  }
+
+  .diagram {
+    width: 1100px;
+    max-width: 100%;
+    position: relative;
+  }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .section-label .icon { font-size: 18px; }
+  .section-label .sub {
+    font-weight: 300;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+
+  /* ── Layout grid ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr 240px;
+    grid-template-rows: auto;
+    gap: 0 0;
+    align-items: center;
+    min-height: 500px;
+    position: relative;
+  }
+
+  /* ── Input cards ── */
+  .input-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 20px;
+  }
+
+  .input-header {
+    margin-bottom: 4px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: var(--blue-dim); }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(74,158,255,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .card-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .badge {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+  }
+  .badge-blue { background: rgba(74,158,255,0.2); color: var(--blue); }
+  .badge-red { background: rgba(255,80,80,0.2); color: #ff6060; }
+  .badge-gray { background: rgba(150,170,200,0.15); color: #99b0cc; }
+  .badge-orange { background: rgba(240,184,73,0.2); color: var(--accent); }
+
+  .lines {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .line-placeholder {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--surface3);
+  }
+  .line-placeholder.w90 { width: 90%; }
+  .line-placeholder.w70 { width: 70%; }
+  .line-placeholder.w80 { width: 80%; }
+
+  .more-dots {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 20px;
+    letter-spacing: 3px;
+    padding: 4px 0;
+    line-height: 1;
+  }
+
+  /* ── Center model box ── */
+  .center-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .model-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border2);
+    border-radius: 16px;
+    padding: 20px 28px;
+    width: 280px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 40px rgba(74, 158, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .model-box::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(74,158,255,0.15), transparent, rgba(45,212,160,0.08));
+    z-index: -1;
+  }
+
+  .model-title {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .model-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .model-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  .converts-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .converts-label span { color: var(--green); font-weight: 600; }
+
+  /* Neural network SVG */
+  .neural-net {
+    width: 140px;
+    height: 90px;
+    margin: 0 auto;
+  }
+
+  .arrow-down {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--blue), transparent);
+    margin: 0 auto;
+    position: relative;
+  }
+  .arrow-down::after {
+    content: '▼';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    color: var(--blue);
+  }
+
+  /* Dense vector bar */
+  .dense-vector-wrap {
+    text-align: center;
+  }
+
+  .dense-vector-bar {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    align-items: stretch;
+    height: 28px;
+    margin-bottom: 6px;
+  }
+
+  .dv-block {
+    width: 20px;
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .dv-dots {
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .dv-values {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .dv-values .highlight { color: var(--green); font-weight: 600; }
+
+  .dense-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+  .dense-label strong { color: var(--text); font-weight: 600; }
+
+  /* ── Output col ── */
+  .output-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 20px;
+  }
+
+  .output-header { margin-bottom: 4px; }
+
+  .vector-card {
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    box-shadow: 0 0 12px rgba(45,212,160,0.06);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .vector-card:hover {
+    border-color: var(--green);
+    box-shadow: 0 0 20px rgba(45, 212, 160, 0.15);
+  }
+
+  .vector-dims {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    text-align: right;
+    padding-right: 4px;
+    margin-top: 2px;
+  }
+  .vector-dims span { color: var(--green-bright); }
+
+  /* Scatter plot */
+  .scatter-wrap {
+    margin-top: 4px;
+  }
+  .scatter-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    margin-top: 8px;
+  }
+  .scatter-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* ── SVG arrows overlay ── */
+  .arrows-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card, .vector-card, .model-box {
+    animation: fadeInUp 0.5s ease both;
+  }
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.2s; }
+  .vector-card:nth-child(1) { animation-delay: 0.1s; }
+  .vector-card:nth-child(2) { animation-delay: 0.15s; }
+  .vector-card:nth-child(3) { animation-delay: 0.2s; }
+  .vector-card:nth-child(4) { animation-delay: 0.25s; }
+
+  .glowing-path {
+    stroke-dasharray: 400;
+    stroke-dashoffset: 400;
+    animation: drawLine 1.2s ease forwards;
+  }
+
+  @keyframes drawLine {
+    to { stroke-dashoffset: 0; }
+  }
+
+  .bottom-row {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+<div class="diagram">
+
+  <div class="layout" id="main-layout">
+
+    <!-- INPUT COLUMN -->
+    <div class="input-col">
+      <div class="input-header">
+        <div class="section-label">
+          <span class="icon">🌐</span>
+          Web Pages
+          <span class="sub">(Input)</span>
+        </div>
+        <div style="font-size:10px; color: var(--text-muted);">(Text, Content)</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span class="badge badge-blue">✦</span>
+          Article: AI Advances
+        </div>
+        <div class="lines">
+          <div class="line-placeholder w90"></div>
+          <div class="line-placeholder w70"></div>
+          <div class="line-placeholder w80"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span class="badge badge-red">r</span>
+          Reddit Post
+        </div>
+        <div style="font-size:11px; color: var(--text-muted); font-style:italic;">"Best Python libraries?"</div>
+        <div class="lines" style="margin-top:5px;">
+          <div class="line-placeholder w80"></div>
+          <div class="line-placeholder w60" style="width:60%"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span class="badge badge-gray">≡</span>
+          News Site
+        </div>
+        <div style="width:100%; height:32px; background: linear-gradient(135deg, #1a3a5c, #1a3b2e); border-radius:5px; margin:4px 0; display:flex; align-items:center; justify-content:center; font-size:14px;">🏔️</div>
+        <div class="lines">
+          <div class="line-placeholder w90"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span class="badge badge-orange">✍</span>
+          Blog
+        </div>
+        <div class="lines">
+          <div class="line-placeholder w80"></div>
+          <div class="line-placeholder w70"></div>
+        </div>
+        <div style="font-size:10px; color: var(--text-muted); margin-top:4px;">···</div>
+      </div>
+
+      <div class="more-dots" style="font-size:14px; color: var(--text-muted);">⋮</div>
+    </div>
+
+    <!-- CENTER COLUMN -->
+    <div class="center-col">
+      <div class="model-box">
+        <div class="model-title">Embedding Model</div>
+        <div class="model-badge">EmbeddingGemma ›</div>
+        <div class="converts-label">Converts Text → <span>Vector</span></div>
+
+        <!-- Neural network -->
+        <svg class="neural-net" viewBox="0 0 140 90" fill="none">
+          <!-- Glow base -->
+          <ellipse cx="70" cy="45" rx="60" ry="35" fill="rgba(74,158,255,0.04)"/>
+
+          <!-- Connections layer 0→1 -->
+          <g stroke="rgba(74,158,255,0.18)" stroke-width="0.8">
+            <line x1="18" y1="22" x2="55" y2="18"/>
+            <line x1="18" y1="22" x2="55" y2="38"/>
+            <line x1="18" y1="22" x2="55" y2="58"/>
+            <line x1="18" y1="45" x2="55" y2="18"/>
+            <line x1="18" y1="45" x2="55" y2="38"/>
+            <line x1="18" y1="45" x2="55" y2="58"/>
+            <line x1="18" y1="68" x2="55" y2="18"/>
+            <line x1="18" y1="68" x2="55" y2="38"/>
+            <line x1="18" y1="68" x2="55" y2="58"/>
+          </g>
+          <!-- Connections layer 1→2 -->
+          <g stroke="rgba(74,158,255,0.14)" stroke-width="0.8">
+            <line x1="55" y1="18" x2="92" y2="28"/>
+            <line x1="55" y1="18" x2="92" y2="48"/>
+            <line x1="55" y1="18" x2="92" y2="68"/>
+            <line x1="55" y1="38" x2="92" y2="28"/>
+            <line x1="55" y1="38" x2="92" y2="48"/>
+            <line x1="55" y1="38" x2="92" y2="68"/>
+            <line x1="55" y1="58" x2="92" y2="28"/>
+            <line x1="55" y1="58" x2="92" y2="48"/>
+            <line x1="55" y1="58" x2="92" y2="68"/>
+          </g>
+          <!-- Connections layer 2→3 -->
+          <g stroke="rgba(45,212,160,0.15)" stroke-width="0.8">
+            <line x1="92" y1="28" x2="126" y2="38"/>
+            <line x1="92" y1="28" x2="126" y2="58"/>
+            <line x1="92" y1="48" x2="126" y2="38"/>
+            <line x1="92" y1="48" x2="126" y2="58"/>
+            <line x1="92" y1="68" x2="126" y2="38"/>
+            <line x1="92" y1="68" x2="126" y2="58"/>
+          </g>
+
+          <!-- Layer 0 nodes (blue) -->
+          <g fill="#4a9eff" filter="url(#glow-b)">
+            <circle cx="18" cy="22" r="6"/>
+            <circle cx="18" cy="45" r="6"/>
+            <circle cx="18" cy="68" r="6"/>
+          </g>
+          <!-- Layer 1 nodes -->
+          <g fill="#3a85e0">
+            <circle cx="55" cy="18" r="6"/>
+            <circle cx="55" cy="38" r="6"/>
+            <circle cx="55" cy="58" r="6"/>
+          </g>
+          <!-- Layer 2 nodes -->
+          <g fill="#3a9dcc">
+            <circle cx="92" cy="28" r="6"/>
+            <circle cx="92" cy="48" r="6"/>
+            <circle cx="92" cy="68" r="6"/>
+          </g>
+          <!-- Layer 3 nodes (green teal) -->
+          <g fill="#2dd4a0" filter="url(#glow-g)">
+            <circle cx="126" cy="38" r="5" opacity="0.8"/>
+            <circle cx="126" cy="58" r="5" opacity="0.6"/>
+          </g>
+          <!-- Scattered green dots -->
+          <circle cx="115" cy="20" r="3" fill="#2dd4a0" opacity="0.5"/>
+          <circle cx="122" cy="72" r="2.5" fill="#5ef7c8" opacity="0.4"/>
+          <circle cx="108" cy="80" r="2" fill="#2dd4a0" opacity="0.3"/>
+
+          <defs>
+            <filter id="glow-b" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+            </filter>
+            <filter id="glow-g" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="blur"/>
+              <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+            </filter>
+          </defs>
+        </svg>
+      </div>
+
+      <!-- Arrow down -->
+      <div class="arrow-down"></div>
+
+      <!-- Dense vector -->
+      <div class="dense-vector-wrap">
+        <div class="dense-vector-bar">
+          <div class="dv-block" style="background:linear-gradient(180deg,#1a4a9e,#1e5cbf)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#1a56b5,#2060cc)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#1c70d0,#2478e0); height:24px; align-self:flex-end;"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#1882d8,#2290f0)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#1590d5,#1ea0e8); height:22px; align-self:center;"></div>
+          <div class="dv-dots">···</div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#15a0b0,#18b5c8)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#18b0a0,#20c8b5)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#18c09a,#22d8a5); height:26px; align-self:flex-end;"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#20d098,#2de8a8)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#22dd90,#30f0a0)"></div>
+          <div class="dv-block" style="background:linear-gradient(180deg,#28e888,#38f898); height:22px; align-self:center;"></div>
+        </div>
+        <div class="dv-values">
+          <span>0.12</span>
+          <span>-0.45</span>
+          <span>0.78</span>
+          <span>···</span>
+          <span class="highlight">0.33</span>
+          <span class="highlight">-0.91</span>
+          <span>0.05</span>
+        </div>
+        <div class="dense-label"><strong>Dense Vector</strong> (Size: <strong style="color:var(--green)">768</strong>)</div>
+      </div>
+    </div>
+
+    <!-- OUTPUT COLUMN -->
+    <div class="output-col">
+      <div class="output-header">
+        <div class="section-label">
+          <span class="icon" style="color:var(--green)">🗄</span>
+          Output
+          <span class="sub">(Vector)</span>
+        </div>
+        <div style="font-size:10px; color: var(--text-muted);">(Numbers)</div>
+      </div>
+
+      <div class="vector-card">[0.12, -0.45, 0.78, …]</div>
+      <div class="vector-card">[0.03, &nbsp;0.91, -0.22, …]</div>
+      <div class="vector-card">[-0.67, 0.15, &nbsp;0.44, …]</div>
+      <div class="vector-card">[0.81, -0.33, 0.05, …]</div>
+
+      <div style="text-align:center; color:var(--text-muted); font-size:18px; line-height:1;">⋮</div>
+
+      <div class="vector-dims">Vector (<span>768</span> dims)</div>
+
+      <!-- Scatter plot -->
+      <div class="scatter-wrap">
+        <svg width="200" height="140" viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Axes -->
+          <line x1="20" y1="120" x2="180" y2="120" stroke="#2e4060" stroke-width="1.5"/>
+          <line x1="20" y1="120" x2="20" y2="10" stroke="#2e4060" stroke-width="1.5"/>
+          <!-- Diagonal axis -->
+          <line x1="20" y1="120" x2="80" y2="135" stroke="#2e4060" stroke-width="1.5"/>
+          <!-- Arrow heads -->
+          <polygon points="180,116 186,120 180,124" fill="#2e4060"/>
+          <polygon points="16,10 20,4 24,10" fill="#2e4060"/>
+          <polygon points="77,133 83,137 76,138" fill="#2e4060"/>
+
+          <!-- Dots cluster 1 (blue) -->
+          <circle cx="60" cy="55" r="7" fill="#4a9eff" opacity="0.7"/>
+          <circle cx="75" cy="45" r="5" fill="#4a9eff" opacity="0.6"/>
+          <circle cx="52" cy="42" r="4" fill="#6ab4ff" opacity="0.5"/>
+          <circle cx="68" cy="65" r="3.5" fill="#4a9eff" opacity="0.5"/>
+          <circle cx="82" cy="52" r="4" fill="#3a8adf" opacity="0.4"/>
+
+          <!-- Dots cluster 2 (green) -->
+          <circle cx="130" cy="70" r="8" fill="#2dd4a0" opacity="0.7"/>
+          <circle cx="145" cy="60" r="5.5" fill="#2dd4a0" opacity="0.6"/>
+          <circle cx="140" cy="82" r="4" fill="#5ef7c8" opacity="0.5"/>
+          <circle cx="155" cy="72" r="3.5" fill="#2dd4a0" opacity="0.45"/>
+          <circle cx="122" cy="62" r="4.5" fill="#1ec090" opacity="0.5"/>
+
+          <!-- Dots cluster 3 (orange/yellow) -->
+          <circle cx="100" cy="30" r="6" fill="#f0b849" opacity="0.65"/>
+          <circle cx="113" cy="22" r="4.5" fill="#f0b849" opacity="0.55"/>
+          <circle cx="90" cy="22" r="3.5" fill="#ffd070" opacity="0.5"/>
+
+          <!-- Dots cluster 4 (purple) -->
+          <circle cx="55" cy="95" r="6.5" fill="#a06be0" opacity="0.6"/>
+          <circle cx="45" cy="82" r="4" fill="#b888f0" opacity="0.5"/>
+          <circle cx="68" cy="90" r="4.5" fill="#9060c8" opacity="0.45"/>
+
+          <!-- Scattered small dots -->
+          <circle cx="95" cy="88" r="2.5" fill="#4a9eff" opacity="0.3"/>
+          <circle cx="160" cy="45" r="2" fill="#2dd4a0" opacity="0.3"/>
+          <circle cx="110" cy="100" r="3" fill="#f0b849" opacity="0.25"/>
+        </svg>
+
+        <div class="scatter-label">Semantic Meaning</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG overlay for arrows (paths computed by script below) -->
+  <svg class="arrows-svg" id="arrows" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ah" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#4a9eff" opacity="0.7"/>
+      </marker>
+      <marker id="ahg" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#2dd4a0" opacity="0.7"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <script>
+    requestAnimationFrame(() => {
+      const diagram = document.querySelector('.diagram');
+      const svg = document.getElementById('arrows');
+      const dR = diagram.getBoundingClientRect();
+
+      // Set viewBox to match actual pixel dimensions
+      svg.setAttribute('viewBox', `0 0 ${dR.width} ${dR.height}`);
+
+      // Position relative to .diagram
+      function pos(el) {
+        const r = el.getBoundingClientRect();
+        return {
+          l: r.left - dR.left, r: r.right - dR.left,
+          t: r.top - dR.top, b: r.bottom - dR.top,
+          cx: (r.left + r.right) / 2 - dR.left,
+          cy: (r.top + r.bottom) / 2 - dR.top,
+        };
+      }
+
+      const cards = [...document.querySelectorAll('.input-col .card')];
+      const model = pos(document.querySelector('.model-box'));
+      const vCards = [...document.querySelectorAll('.output-col .vector-card')];
+      const dense = pos(document.querySelector('.dense-vector-wrap'));
+      const scatter = pos(document.querySelector('.scatter-wrap'));
+
+      const ns = 'http://www.w3.org/2000/svg';
+      function addPath(d, stroke, opacity, markerEnd, delay, dasharray) {
+        const p = document.createElementNS(ns, 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('stroke', stroke);
+        p.setAttribute('stroke-width', '1.2');
+        p.setAttribute('fill', 'none');
+        p.setAttribute('opacity', String(opacity));
+        p.setAttribute('marker-end', `url(#${markerEnd})`);
+        p.classList.add('glowing-path');
+        if (delay) p.style.animationDelay = delay + 's';
+        if (dasharray) p.setAttribute('stroke-dasharray', dasharray);
+        svg.appendChild(p);
+      }
+
+      // Spread arrival/departure points along model box edge
+      const modelH = model.b - model.t;
+
+      // Input cards → model box (blue, fan into left edge)
+      cards.forEach((card, i) => {
+        const c = pos(card);
+        const sx = c.r, sy = c.cy;
+        const ex = model.l;
+        // Distribute arrival Y across top 80% of model box
+        const t = cards.length > 1 ? i / (cards.length - 1) : 0.5;
+        const ey = model.t + modelH * (0.15 + t * 0.7);
+        const mx = (sx + ex) / 2;
+        addPath(
+          `M${sx},${sy} Q${mx},${sy} ${ex},${ey}`,
+          '#4a9eff', 0.45 - i * 0.04, 'ah', i * 0.1
+        );
+      });
+
+      // Model box → output vector cards (green, fan from right edge)
+      vCards.forEach((vc, i) => {
+        const v = pos(vc);
+        const ex = v.l, ey = v.cy;
+        // Distribute departure Y across top 80% of model box
+        const t = vCards.length > 1 ? i / (vCards.length - 1) : 0.5;
+        const sy = model.t + modelH * (0.15 + t * 0.7);
+        const sx = model.r;
+        const mx = (sx + ex) / 2;
+        addPath(
+          `M${sx},${sy} Q${mx},${ey} ${ex},${ey}`,
+          '#2dd4a0', 0.5 - i * 0.04, 'ahg', 0.5 + i * 0.05
+        );
+      });
+
+      // Dense vector → scatter plot (green dashed)
+      addPath(
+        `M${dense.r},${dense.cy} Q${(dense.r + scatter.l) / 2},${(dense.cy + scatter.cy) / 2} ${scatter.l},${scatter.cy}`,
+        '#2dd4a0', 0.4, 'ahg', 0.8, '5 3'
+      );
+    });
+  </script>
+
+</div>
+</body>
+</html>
