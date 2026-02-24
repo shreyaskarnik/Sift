@@ -176,37 +176,7 @@ function titleCardHTML(title, subtitle, extra = "") {
 }
 
 function stepCardHTML(stepNum, total, heading, description) {
-  return titleCardHTML(
-    heading,
-    description,
-    `.step-badge {
-      display: inline-block;
-      padding: 4px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.3);
-      background: rgba(52, 211, 153, 0.08);
-      margin-bottom: 18px;
-    }
-    body::before {
-      content: "Step ${stepNum} of ${total}";
-      display: inline-block;
-      padding: 4px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.3);
-      background: rgba(52, 211, 153, 0.08);
-      margin-bottom: 18px;
-    }`
-  );
+  return titleCardHTML(heading, description);
 }
 
 // ─── Text overlay (bottom bar annotation) ───────────────────────────────────
