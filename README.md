@@ -21,9 +21,7 @@ Users can label items (thumbs up/down) to collect training data, export it as CS
 ## Demo
 
 <div align="center">
-
-https://github.com/shreyaskarnik/Sift/raw/main/video-output/sift-demo.mp4
-
+  <video src="https://github.com/shreyaskarnik/Sift/raw/main/video-output/sift-demo.mp4" controls width="100%"></video>
 </div>
 
 ## At a Glance
