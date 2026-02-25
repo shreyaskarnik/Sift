@@ -351,7 +351,12 @@ def main():
         if not token:
             print("Set HF_TOKEN env var or pass --hf-token to push to Hub")
             sys.exit(1)
-        result = upload_model_to_hub(output_dir, args.push_to_hub, token)
+        result = upload_model_to_hub(
+            output_dir, args.push_to_hub, token,
+            base_model=AppConfig.MODEL_NAME,
+            epochs=args.epochs,
+            learning_rate=args.lr,
+        )
         print(result)
 
     print(f"\nTo test locally:\n  python train.py --serve {onnx_output}")

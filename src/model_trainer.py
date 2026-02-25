@@ -264,10 +264,79 @@ def get_top_hits(
 
     return "\n".join(result)
 
-def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
+def _generate_model_card(repo_id: str, base_model: str, epochs: int, lr: float) -> str:
+    """Generate a model card README for a Sift fine-tuned model."""
+    return f"""---
+language: en
+license: apache-2.0
+library_name: onnx
+base_model: {base_model}
+tags:
+  - sentence-transformers
+  - embeddings
+  - onnx
+  - embeddinggemma-tuning-lab
+  - sift
+  - chrome-extension
+pipeline_tag: sentence-similarity
+---
+
+# {repo_id.split("/")[-1]}
+
+Fine-tuned [EmbeddingGemma-300M]({f"https://huggingface.co/{base_model}"}) for personalized content scoring with [Sift](https://github.com/shreyaskarnik/Sift).
+
+## What is this?
+
+This is a sentence embedding model fine-tuned on personal browsing labels collected with the Sift Chrome extension. It scores feed items (Hacker News, Reddit, X) against interest categories using cosine similarity, running entirely in the browser via [Transformers.js](https://huggingface.co/docs/transformers.js).
+
+## Training
+
+- **Base model:** [{base_model}]({f"https://huggingface.co/{base_model}"})
+- **Loss:** MultipleNegativesRankingLoss (contrastive)
+- **Task prompt:** `task: classification | query: `
+- **Epochs:** {epochs}
+- **Learning rate:** {lr}
+- **Framework:** [sentence-transformers](https://sbert.net/)
+
+## ONNX Variants
+
+| File | Format | Use case |
+|------|--------|----------|
+| `onnx/model.onnx` | FP32 | Reference |
+| `onnx/model_quantized.onnx` | INT8 | Smaller download |
+| `onnx/model_q4.onnx` | 4-bit | WASM inference |
+| `onnx/model_no_gather_q4.onnx` | 4-bit | WebGPU inference |
+
+## Usage with Sift
+
+Set this model ID (`{repo_id}`) in Sift's popup settings under **Model Source**. The extension loads it directly from HuggingFace — no authentication needed.
+
+## Usage with Transformers.js
+
+```javascript
+import {{ pipeline }} from "@huggingface/transformers";
+const extractor = await pipeline("feature-extraction", "{repo_id}", {{ dtype: "q4" }});
+const output = await extractor("Your text here", {{ pooling: "mean", normalize: true }});
+```
+
+## Privacy
+
+ONNX files contain only numerical weights and tokenizer data — **no training examples, user labels, or personal information**.
+"""
+
+
+def upload_model_to_hub(
+    folder_path: Path,
+    repo_name: str,
+    token: str,
+    base_model: str = "google/embeddinggemma-300m",
+    epochs: int = 4,
+    learning_rate: float = 2e-5,
+) -> str:
     """
     Uploads a local model folder to the Hugging Face Hub.
     Creates the repository if it doesn't exist.
+    Generates a model card README if one doesn't already exist.
 
     repo_name accepts either:
     - "model-name" (auto-prefixed with authenticated username)
@@ -292,18 +361,26 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
             username = user_info["name"]
             repo_id = f"{username}/{requested}"
 
+        # Write model card if none exists in the folder
+        readme_path = folder_path / "README.md"
+        if not readme_path.exists():
+            readme_path.write_text(
+                _generate_model_card(repo_id, base_model, epochs, learning_rate)
+            )
+            print(f"Generated model card: {readme_path}")
+
         print(f"Preparing to upload to: {repo_id}")
 
         # Create the repo (safe if it already exists)
         api.create_repo(repo_id=repo_id, exist_ok=True)
-        
+
         # Upload the folder
         url = api.upload_folder(
             folder_path=folder_path,
             repo_id=repo_id,
             repo_type="model"
         )
-        
+
         info = model_info(
             repo_id=repo_id,
             token=token
@@ -317,7 +394,7 @@ def upload_model_to_hub(folder_path: Path, repo_name: str, token: str) -> str:
                 overwrite=True,
                 token=token,
             )
-        
+
         return f"✅ Success! Model published at: {url}"
     except Exception as e:
         print(f"Upload failed: {e}")
