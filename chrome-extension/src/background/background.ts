@@ -127,12 +127,41 @@ chrome.storage.local.get([STORAGE_KEYS.LABEL_SCHEMA, STORAGE_KEYS.LABELS]).then(
 // ---------------------------------------------------------------------------
 
 let cachedStatus: ModelStatus = { state: "idle" };
+let lastBroadcastTime = 0;
+let pendingBroadcast: ReturnType<typeof setTimeout> | null = null;
+
+const BROADCAST_THROTTLE_MS = 250;
 
 function broadcastStatus(status: Partial<ModelStatus>): void {
   cachedStatus = { ...cachedStatus, ...status };
-  chrome.runtime
-    .sendMessage({ type: MSG.MODEL_STATUS, payload: cachedStatus })
-    .catch(() => {});
+
+  // Non-loading states (ready, error, idle) always send immediately
+  if (cachedStatus.state !== "loading") {
+    if (pendingBroadcast) { clearTimeout(pendingBroadcast); pendingBroadcast = null; }
+    lastBroadcastTime = Date.now();
+    chrome.runtime
+      .sendMessage({ type: MSG.MODEL_STATUS, payload: cachedStatus })
+      .catch(() => {});
+    return;
+  }
+
+  // Throttle loading/progress updates to avoid popup flicker
+  const now = Date.now();
+  if (now - lastBroadcastTime >= BROADCAST_THROTTLE_MS) {
+    if (pendingBroadcast) { clearTimeout(pendingBroadcast); pendingBroadcast = null; }
+    lastBroadcastTime = now;
+    chrome.runtime
+      .sendMessage({ type: MSG.MODEL_STATUS, payload: cachedStatus })
+      .catch(() => {});
+  } else if (!pendingBroadcast) {
+    pendingBroadcast = setTimeout(() => {
+      pendingBroadcast = null;
+      lastBroadcastTime = Date.now();
+      chrome.runtime
+        .sendMessage({ type: MSG.MODEL_STATUS, payload: cachedStatus })
+        .catch(() => {});
+    }, BROADCAST_THROTTLE_MS - (now - lastBroadcastTime));
+  }
 }
 
 // ---------------------------------------------------------------------------
