@@ -32,6 +32,7 @@ import {
   TASTE_MAX_PER_CATEGORY,
   TASTE_NEG_ALPHA,
   TASTE_MIN_NEGATIVES,
+  EMBED_TASK_PREFIX,
 } from "../shared/constants";
 import type {
   AgentStory,
@@ -307,7 +308,8 @@ async function explainScore(
 async function embed(texts: string[]): Promise<Float32Array[]> {
   if (!tokenizer || !model) throw new Error("Model not loaded");
 
-  const inputs = tokenizer(texts, {
+  const prefixed = texts.map((t) => EMBED_TASK_PREFIX + t);
+  const inputs = tokenizer(prefixed, {
     padding: true,
     truncation: true,
     max_length: 256,

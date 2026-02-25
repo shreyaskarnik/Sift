@@ -5,6 +5,13 @@ import type { CategoryDef } from "./types";
 /** ONNX-quantized embedding model for scoring via Transformers.js */
 export const MODEL_ID = "onnx-community/embeddinggemma-300m-ONNX";
 
+/**
+ * EmbeddingGemma task prompt prefix for classification embeddings.
+ * Must match the prompt used during fine-tuning (config.py TASK_NAME = "Classification").
+ * See config_sentence_transformers.json in the model repo.
+ */
+export const EMBED_TASK_PREFIX = "task: classification | query: ";
+
 /** Default anchor phrase for contrastive similarity scoring */
 export const DEFAULT_QUERY_ANCHOR = "news";
 
