@@ -268,7 +268,7 @@ def _generate_model_card(repo_id: str, base_model: str, epochs: int, lr: float) 
     """Generate a model card README for a Sift fine-tuned model."""
     return f"""---
 language: en
-license: apache-2.0
+license: gemma
 library_name: onnx
 base_model: {base_model}
 tags:
@@ -284,6 +284,8 @@ pipeline_tag: sentence-similarity
 # {repo_id.split("/")[-1]}
 
 Fine-tuned [EmbeddingGemma-300M]({f"https://huggingface.co/{base_model}"}) for personalized content scoring with [Sift](https://github.com/shreyaskarnik/Sift).
+
+> **License:** This model is a derivative of Google's Gemma and is subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). By using this model, you agree to those terms.
 
 ## What is this?
 
