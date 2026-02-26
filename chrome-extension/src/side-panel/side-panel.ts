@@ -578,6 +578,7 @@ let currentPageTitle = "";
 let lastPageState: PageScoreResponse["state"] | "" = "";
 let currentPageRanking: PresetRanking | undefined;
 let currentPageAnchorOverride: string | undefined;
+let pageScoreRequestSeq = 0;
 
 function renderPageScore(resp: PageScoreResponse): void {
   lastPageScoreResp = resp;
@@ -735,19 +736,27 @@ async function savePageLabel(label: "positive" | "negative"): Promise<void> {
   }
 }
 
-async function loadPageScore(): Promise<void> {
+async function loadPageScore(tabIdHint?: number): Promise<void> {
+  const requestSeq = ++pageScoreRequestSeq;
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
-    currentPageTabId = tab.id;
+    let tabId = tabIdHint;
+    if (!tabId) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = tab?.id;
+    }
+    if (!tabId) return;
+    currentPageTabId = tabId;
 
     const resp = await chrome.runtime.sendMessage({
       type: MSG.GET_PAGE_SCORE,
-      payload: { tabId: tab.id },
+      payload: { tabId },
     }) as PageScoreResponse;
 
+    // Ignore stale responses from older in-flight loads after a tab switch.
+    if (requestSeq !== pageScoreRequestSeq || tabId !== currentPageTabId) return;
     renderPageScore(resp);
   } catch {
+    if (requestSeq !== pageScoreRequestSeq) return;
     renderPageScore({ title: "", normalizedTitle: "", result: null, state: "unavailable" });
   }
 }
@@ -1051,12 +1060,12 @@ agentFetchBtn.addEventListener("click", fetchAgentFeed);
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   currentPageTabId = tabId;
-  void loadPageScore();
+  void loadPageScore(tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === currentPageTabId && changeInfo.status === "complete") {
-    void loadPageScore();
+    void loadPageScore(tabId);
   }
 });
 

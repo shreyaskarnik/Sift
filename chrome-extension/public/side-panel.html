@@ -243,6 +243,12 @@ body {
   gap: 6px;
 }
 
+.fold-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .section-badge {
   font-size: 9px;
   font-weight: 500;
@@ -262,6 +268,39 @@ body {
   border-radius: var(--radius);
   background: var(--bg);
   padding: 10px;
+}
+
+.sp-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  margin-bottom: 0;
+  user-select: none;
+}
+
+.sp-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sp-fold > summary::marker {
+  content: "";
+}
+
+.sp-fold > summary .fold-chevron {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-90deg);
+  transition: transform 0.16s ease;
+}
+
+.sp-fold[open] > summary {
+  margin-bottom: 6px;
+}
+
+.sp-fold[open] > summary .fold-chevron {
+  transform: rotate(0deg);
 }
 
 /* ── Hero Card (Current Page) ── */
@@ -1359,8 +1398,11 @@ button.danger:hover {
     </div>
 
     <!-- Categories -->
-    <div class="sp-section">
-      <div class="section-header">Categories <span id="category-count-badge" class="section-badge"></span></div>
+    <details class="sp-section sp-fold">
+      <summary class="section-header">
+        <span class="fold-title">Categories <span id="category-count-badge" class="section-badge"></span></span>
+        <span class="fold-chevron" aria-hidden="true">▾</span>
+      </summary>
       <div id="onboarding-hint" class="onboarding-hint" style="display:none">
         Pick your interests below, then browse HN, Reddit, or X to see scoring in action.
       </div>
@@ -1375,21 +1417,14 @@ button.danger:hover {
         <span>per item</span>
       </div>
       <div id="category-grid" class="category-grid"></div>
-    </div>
-
-    <!-- Muted Keywords -->
-    <div class="sp-section">
-      <div class="section-header">Muted Keywords <span id="muted-count" class="section-badge"></span></div>
-      <textarea id="muted-textarea" class="muted-textarea" placeholder="keyword1, keyword2, keyword3..." rows="3"></textarea>
-      <div class="muted-footer">
-        <span id="muted-count-display" class="muted-count"></span>
-        <button id="save-muted" class="btn-sm" type="button">Save</button>
-      </div>
-    </div>
+    </details>
 
     <!-- Taste Profile -->
-    <div class="sp-section">
-      <div class="section-header">My Taste Profile <span id="taste-badge" class="section-badge"></span></div>
+    <details class="sp-section sp-fold">
+      <summary class="section-header">
+        <span class="fold-title">My Taste Profile <span id="taste-badge" class="section-badge"></span></span>
+        <span class="fold-chevron" aria-hidden="true">▾</span>
+      </summary>
       <div id="taste-empty" class="taste-empty">Label at least 10 items to see your taste profile.</div>
       <div id="taste-results" style="display:none">
         <div id="taste-radar" class="taste-radar"></div>
@@ -1400,11 +1435,14 @@ button.danger:hover {
         <span id="taste-meta" class="taste-meta"></span>
         <button id="taste-refresh" class="btn-sm" style="display:none">Refresh</button>
       </div>
-    </div>
+    </details>
 
     <!-- Settings -->
-    <div class="sp-section">
-      <div class="section-header">Settings</div>
+    <details class="sp-section sp-fold">
+      <summary class="section-header">
+        <span class="fold-title">Settings</span>
+        <span class="fold-chevron" aria-hidden="true">▾</span>
+      </summary>
       <div class="model-row">
         <span class="model-name">Scoring</span>
         <span id="model-status" class="model-detail">Initializing...</span>
@@ -1434,11 +1472,14 @@ button.danger:hover {
       <div class="sp-footer">
         <p>Sift through the noise &mdash; powered by EmbeddingGemma.</p>
       </div>
-    </div>
+    </details>
 
     <!-- Training Data -->
-    <div class="sp-section">
-      <div class="section-header">Training Data <span id="label-count-badge" class="section-badge"></span></div>
+    <details class="sp-section sp-fold">
+      <summary class="section-header">
+        <span class="fold-title">Training Data <span id="label-count-badge" class="section-badge"></span></span>
+        <span class="fold-chevron" aria-hidden="true">▾</span>
+      </summary>
       <div id="label-counts">No labels collected yet.</div>
       <div id="data-readiness" class="data-readiness"></div>
       <div id="anchor-gap-hints" class="anchor-gap-hints" style="display:none"></div>
@@ -1454,6 +1495,16 @@ button.danger:hover {
         </label>
       </div>
       <button id="clear-data" class="danger">Clear All Data</button>
+    </details>
+
+    <!-- Muted Keywords -->
+    <div class="sp-section">
+      <div class="section-header">Muted Keywords <span id="muted-count" class="section-badge"></span></div>
+      <textarea id="muted-textarea" class="muted-textarea" placeholder="keyword1, keyword2, keyword3..." rows="3"></textarea>
+      <div class="muted-footer">
+        <span id="muted-count-display" class="muted-count"></span>
+        <button id="save-muted" class="btn-sm" type="button">Save</button>
+      </div>
     </div>
   </div>
 
