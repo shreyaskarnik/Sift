@@ -3,15 +3,17 @@
   "name": "Sift",
   "version": "0.1.0",
   "description": "Sift through the noise. Score your feed with EmbeddingGemma, right in the browser.",
-  "permissions": ["activeTab", "tabs", "storage", "unlimitedStorage"],
+  "permissions": ["activeTab", "tabs", "storage", "unlimitedStorage", "sidePanel"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16-dark.png",
       "48": "icons/icon48-dark.png",
       "128": "icons/icon128-dark.png"
     }
+  },
+  "side_panel": {
+    "default_path": "side-panel.html"
   },
   "background": {
     "service_worker": "background.js",
