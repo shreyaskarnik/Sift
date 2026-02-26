@@ -21,7 +21,7 @@
 
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -129,40 +129,72 @@ async function injectMockState(page, extId, mockState) {
     waitUntil: "domcontentloaded",
     timeout: 10000,
   });
+  // Set storage and install sendMessage interceptor before reload
   await page.evaluate(async (state) => {
     await chrome.storage.local.set(state);
   }, mockState);
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(1500);
-}
 
-async function patchSidePanelDOM(page) {
-  await page.evaluate(() => {
-    const statusDot = document.getElementById("status-dot");
-    if (statusDot) statusDot.className = "status-dot ready";
-    const statusLabel = document.getElementById("status-label");
-    if (statusLabel) statusLabel.textContent = "WEBGPU";
-    const modelStatus = document.getElementById("model-status");
-    if (modelStatus) modelStatus.textContent = "Ready \u2014 WEBGPU";
-    const progressBar = document.getElementById("progress-bar-container");
-    if (progressBar) progressBar.style.display = "none";
-    const modelIdEl = document.getElementById("model-id-display");
-    if (modelIdEl) modelIdEl.textContent = "onnx-community/embeddinggemma-300m-ONNX";
-    const labelCounts = document.getElementById("label-counts");
-    if (labelCounts) {
-      labelCounts.textContent =
-        "Total: 76 (52 positive, 24 negative)\nHN: 41 | Reddit: 22 | X: 13 | Import: 0";
-    }
-    const labelBadge = document.getElementById("label-count-badge");
-    if (labelBadge) labelBadge.textContent = "76";
-    const clearBtn = document.getElementById("clear-data");
-    if (clearBtn) clearBtn.textContent = "Clear 76 Labels";
+  // Intercept chrome.runtime.sendMessage BEFORE side-panel.js runs on reload.
+  // This prevents the background from overwriting our mock state with real
+  // MODEL_STATUS, GET_LABELS responses, etc.
+  await page.addInitScript(() => {
+    const origSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = function (message, ...args) {
+      if (message?.type === "GET_STATUS") {
+        const cb = typeof args[0] === "function" ? args[0] : args[1];
+        const response = {
+          state: "ready",
+          backend: "webgpu",
+          modelId: "onnx-community/embeddinggemma-300m-ONNX",
+        };
+        if (cb) { cb(response); return true; }
+        return Promise.resolve(response);
+      }
+      if (message?.type === "GET_LABELS") {
+        const cb = typeof args[0] === "function" ? args[0] : args[1];
+        const response = {
+          labels: Array.from({ length: 76 }, (_, i) => ({
+            text: `Item ${i}`,
+            polarity: i < 52 ? "positive" : "negative",
+            source: i < 41 ? "hn" : i < 63 ? "reddit" : "x",
+            anchorText: "NEWS",
+            categoryId: "news",
+            timestamp: Date.now(),
+          })),
+        };
+        if (cb) { cb(response); return true; }
+        return Promise.resolve(response);
+      }
+      if (message?.type === "GET_PAGE_SCORE") {
+        const response = { score: null, message: "Not available for this page" };
+        const cb = typeof args[0] === "function" ? args[0] : args[1];
+        if (cb) { cb(response); return true; }
+        return Promise.resolve(response);
+      }
+      if (message?.type === "COMPUTE_TASTE_PROFILE") {
+        const cb = typeof args[0] === "function" ? args[0] : args[1];
+        if (cb) { cb(null); return true; }
+        return Promise.resolve(null);
+      }
+      // Pass through everything else
+      return origSendMessage(message, ...args);
+    };
+    // Suppress MODEL_STATUS broadcasts from background
+    const origAddListener = chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);
+    chrome.runtime.onMessage.addListener = function (listener) {
+      origAddListener(function (message, sender, sendResponse) {
+        if (message?.type === "MODEL_STATUS") return;
+        if (message?.type === "PAGE_SCORE_UPDATED") return;
+        return listener(message, sender, sendResponse);
+      });
+    };
   });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(2000);
 }
 
 function compositeHTML(leftImagePath, rightImagePath, totalWidth, totalHeight, panelWidth) {
-  const leftData = readFileSync(leftImagePath).toString("base64");
-  const rightData = readFileSync(rightImagePath).toString("base64");
   const siteWidth = totalWidth - panelWidth;
 
   return `<!DOCTYPE html>
@@ -208,9 +240,9 @@ function compositeHTML(leftImagePath, rightImagePath, totalWidth, totalHeight, p
   </style>
 </head>
 <body>
-  <div class="site"><img src="data:image/png;base64,${leftData}" /></div>
+  <div class="site"><img src="file://${leftImagePath}" /></div>
   <div class="divider"></div>
-  <div class="panel"><img src="data:image/png;base64,${rightData}" /></div>
+  <div class="panel"><img src="file://${rightImagePath}" /></div>
 </body>
 </html>`;
 }
@@ -265,8 +297,6 @@ async function main() {
 
   // ─── Capture side panel ─────────────────────────────────────────────────
   console.log("📷 Capturing side panel...");
-  await patchSidePanelDOM(page);
-
   await page.setViewportSize({ width: PANEL_WIDTH, height: HEIGHT });
   await page.waitForTimeout(500);
   const panelScreenshot = join(OUT_DIR, "_side-panel-raw.png");
@@ -298,8 +328,10 @@ async function main() {
   const compositeHtml = compositeHTML(
     hnScreenshot, panelScreenshot, WIDTH, HEIGHT, PANEL_WIDTH,
   );
-  await page.setContent(compositeHtml, { waitUntil: "load" });
-  await page.waitForTimeout(500);
+  const tmpHtml = join(OUT_DIR, "_composite.html");
+  writeFileSync(tmpHtml, compositeHtml);
+  await page.goto(`file://${tmpHtml}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1000);
   const sidePanelOut = join(OUT_DIR, "side-panel.png");
   await page.screenshot({ path: sidePanelOut, type: "png" });
   console.log(`   ✅ ${sidePanelOut}\n`);
@@ -308,7 +340,6 @@ async function main() {
   console.log("📷 Capturing muted keywords variant...");
   const mutedMock = buildMockState({ mutedKeywords: ["crypto", "bitcoin"] });
   await injectMockState(page, extId, mutedMock);
-  await patchSidePanelDOM(page);
 
   await page.setViewportSize({ width: PANEL_WIDTH, height: HEIGHT });
   await page.waitForTimeout(500);
@@ -319,14 +350,15 @@ async function main() {
   const mutedCompositeHtml = compositeHTML(
     hnScreenshot, mutedPanelScreenshot, WIDTH, HEIGHT, PANEL_WIDTH,
   );
-  await page.setContent(mutedCompositeHtml, { waitUntil: "load" });
-  await page.waitForTimeout(500);
+  writeFileSync(tmpHtml, mutedCompositeHtml);
+  await page.goto(`file://${tmpHtml}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1000);
   const mutedOut = join(OUT_DIR, "muted-keywords.png");
   await page.screenshot({ path: mutedOut, type: "png" });
   console.log(`   ✅ ${mutedOut}\n`);
 
   // ─── Cleanup intermediate files ─────────────────────────────────────────
-  for (const tmp of [panelScreenshot, hnScreenshot, mutedPanelScreenshot]) {
+  for (const tmp of [panelScreenshot, hnScreenshot, mutedPanelScreenshot, tmpHtml]) {
     if (existsSync(tmp)) rmSync(tmp);
   }
 
