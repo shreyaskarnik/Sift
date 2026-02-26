@@ -128,7 +128,7 @@ async function patchSidePanelDOM(page) {
     if (modelStatus) modelStatus.textContent = "Ready \u2014 WEBGPU";
     const progressBar = document.getElementById("progress-bar-container");
     if (progressBar) progressBar.style.display = "none";
-    const modelIdEl = document.getElementById("model-id");
+    const modelIdEl = document.getElementById("model-id-display");
     if (modelIdEl) modelIdEl.textContent = "onnx-community/embeddinggemma-300m-ONNX";
     const labelCounts = document.getElementById("label-counts");
     if (labelCounts) {
@@ -137,7 +137,7 @@ async function patchSidePanelDOM(page) {
     }
     const labelBadge = document.getElementById("label-count-badge");
     if (labelBadge) labelBadge.textContent = "76";
-    const clearBtn = document.getElementById("clear-data-btn");
+    const clearBtn = document.getElementById("clear-data");
     if (clearBtn) clearBtn.textContent = "Clear 76 Labels";
   });
 }
