@@ -282,6 +282,18 @@ export function applyScore(
 ): void {
   injectStyles();
 
+  // Muted-keyword filtered items: near-invisible, no controls
+  if (result.filtered) {
+    el.style.setProperty("--ss-opacity", "0.08");
+    el.style.setProperty("--ss-sat", "0");
+    el.dataset.siftScore = "-1";
+    el.dataset.siftFiltered = "true";
+    if (!el.classList.contains("ss-scored")) {
+      el.classList.add("ss-scored");
+    }
+    return; // no chip, no buttons, no explain
+  }
+
   const score = Math.max(0, Math.min(1, result.rawScore));
   const hue = Math.round(scoreToHue(score));
   const { opacity, saturate } = computeSuppression(score);
