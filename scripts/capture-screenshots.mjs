@@ -54,7 +54,7 @@ function buildExtension() {
 }
 
 // ─── Mock state ─────────────────────────────────────────────────────────────
-// Mirrors BUILTIN_CATEGORIES from src/shared/constants.ts
+// Keep in sync with chrome-extension/src/shared/constants.ts BUILTIN_CATEGORIES
 const BUILTIN_CATEGORIES = [
   { id: "news",         anchorText: "MY_FAVORITE_NEWS",       label: "News",               builtin: true },
   { id: "ai-research",  anchorText: "AI_RESEARCH",            label: "AI Research",         builtin: true, group: "tech" },
@@ -101,6 +101,24 @@ function buildMockState({ mutedKeywords = [] } = {}) {
     site_enabled: { hn: true, reddit: true, x: true },
     page_scoring_enabled: true,
     top_k_pills: 2,
+    taste_profile: {
+      state: "ready",
+      probes: [
+        { probe: "Machine learning research", score: 0.84, category: "AI Research" },
+        { probe: "Rust and systems programming", score: 0.78, category: "Programming" },
+        { probe: "YC startup launches", score: 0.72, category: "Startups" },
+        { probe: "Open source projects", score: 0.69, category: "Open Source" },
+        { probe: "Browser APIs and web platform", score: 0.65, category: "Deep Tech" },
+        { probe: "Indie game development", score: 0.61, category: "Gaming" },
+        { probe: "Climate and renewables", score: 0.58, category: "Climate & Energy" },
+        { probe: "Space launches and missions", score: 0.54, category: "Space & Aerospace" },
+        { probe: "Privacy tools and encryption", score: 0.51, category: "Security & Privacy" },
+        { probe: "Health and longevity research", score: 0.47, category: "Health & Biotech" },
+      ],
+      labelCount: 76,
+      timestamp: Date.now(),
+      cacheKey: "mock-screenshot",
+    },
   };
 }
 
@@ -259,14 +277,21 @@ async function main() {
 
   // ─── Capture HN background ─────────────────────────────────────────────
   console.log("📷 Capturing HN background...");
-  await page.goto("https://news.ycombinator.com", {
-    waitUntil: "domcontentloaded",
-    timeout: 15000,
-  });
-  await page.waitForTimeout(2000);
   const hnScreenshot = join(OUT_DIR, "_hn-background.png");
-  await page.screenshot({ path: hnScreenshot, type: "png" });
-  console.log(`   ✅ HN background captured`);
+  try {
+    await page.goto("https://news.ycombinator.com", {
+      waitUntil: "domcontentloaded",
+      timeout: 15000,
+    });
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: hnScreenshot, type: "png" });
+    console.log(`   ✅ HN background captured`);
+  } catch (err) {
+    console.log(`   ⚠ HN unreachable (${err.message}), using dark placeholder`);
+    const placeholderHtml = `<html><body style="width:${WIDTH}px;height:${HEIGHT}px;background:#1a1b1d;margin:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#666;font-size:14px;">news.ycombinator.com</body></html>`;
+    await page.setContent(placeholderHtml, { waitUntil: "load" });
+    await page.screenshot({ path: hnScreenshot, type: "png" });
+  }
 
   // ─── Composite: side-panel.png ──────────────────────────────────────────
   console.log("🧩 Compositing side-panel.png...");
