@@ -211,3 +211,13 @@ export interface AgentFetchHNResponse {
   elapsed: number;
   error?: string;
 }
+
+/** A cached embedding entry in chrome.storage.local */
+export interface EmbeddingCacheEntry {
+  /** Float32Array serialized as number[] for JSON storage */
+  embedding: number[];
+  /** Model ID that generated this embedding (cache invalidation key) */
+  modelId: string;
+  /** Unix timestamp for LRU eviction */
+  timestamp: number;
+}
