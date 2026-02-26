@@ -331,7 +331,7 @@ function buildScenes() {
       type: "title",
       html: titleCardHTML(
         '<span class="accent">Sift</span>',
-        "Score your feed with EmbeddingGemma, right in the browser.",
+        "Score your feed with EmbeddingGemma v0.2 — side panel, smart caching, muted keywords.",
         { logo: true, poweredBy: true },
       ),
       hold: TITLE_HOLD_SEC,
@@ -361,24 +361,24 @@ function buildScenes() {
     {
       type: "screenshot",
       file: ss("hn-after.png"),
-      annotation: "After — low-relevance dimmed, scores + inspector + labels visible",
+      annotation: "After — low-relevance dimmed, muted items hidden, scores + inspector visible",
       hold: HOLD_SEC + 1,
     },
 
-    // ── Popup ──
+    // ── Side Panel ──
     {
       type: "title",
       html: titleCardHTML(
-        "The Popup",
-        "Page score, category pills, 25 built-in categories, taste profile, training data.",
+        "The Side Panel",
+        "Persistent dashboard — page score, 25 categories, muted keywords, taste profile.",
         { wordCloud: true },
       ),
       hold: TITLE_HOLD_SEC,
     },
     {
       type: "screenshot",
-      file: ss("popup.png"),
-      annotation: "WebGPU inference · 23/25 categories active · 76 labels collected",
+      file: ss("side-panel.png"),
+      annotation: "Side panel — always open while you browse",
       hold: HOLD_SEC + 1,
     },
 
@@ -406,8 +406,34 @@ function buildScenes() {
     {
       type: "screenshot",
       file: ss("techcrunch.png"),
-      annotation: "TechCrunch",
+      annotation: "TechCrunch — page scored in the side panel",
       hold: HOLD_SEC,
+    },
+
+    // ── Muted Keywords ──
+    {
+      type: "title",
+      html: titleCardHTML(
+        "Muted Keywords",
+        "Block the noise. Items matching your keywords fade to near-invisible — no model inference wasted.",
+      ),
+      hold: TITLE_HOLD_SEC,
+    },
+    {
+      type: "screenshot",
+      file: ss("muted-keywords.png"),
+      annotation: 'Muted "crypto" — matching items at 8% opacity, zero compute spent',
+      hold: HOLD_SEC + 1,
+    },
+
+    // ── Embedding Cache ──
+    {
+      type: "title",
+      html: titleCardHTML(
+        "Smart Caching",
+        "Seen it before? Skip the model.<br>LRU cache for 2,000 embeddings — instant re-scores on tab switches and infinite scroll.",
+      ),
+      hold: TITLE_HOLD_SEC,
     },
 
     // ── Taste Profile ──
@@ -507,10 +533,11 @@ async function main() {
     console.log("   Place your screenshots there and re-run. Expected files:");
     console.log("     hn-before.png       — Raw HN feed (no Sift)");
     console.log("     hn-after.png        — HN with scoring + dimming + inspector");
-    console.log("     popup.png           — Full popup screenshot");
+    console.log("     side-panel.png      — Side panel open alongside a feed");
+    console.log("     muted-keywords.png  — HN with muted keywords at low opacity");
     console.log("     reddit.png          — Reddit with scoring + inspector");
     console.log("     x.png              — X/Twitter with scoring + inspector");
-    console.log("     techcrunch.png      — TechCrunch article with Sift popup");
+    console.log("     techcrunch.png      — TechCrunch article with side panel");
     console.log("     taste.png           — Taste Profile page with radar chart");
     console.log("     label-manager.png   — Label Manager page");
     process.exit(0);
