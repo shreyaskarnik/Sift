@@ -1,6 +1,6 @@
 /**
  * Shared taste profile cache-key computation.
- * Used by background (after compute), popup (staleness check), and full-page view.
+ * Used by background (after compute), side panel (staleness check), and full-page view.
  */
 import { STORAGE_KEYS, DEFAULT_ACTIVE_IDS } from "./constants";
 import { PROBES_VERSION } from "./taste-probes";

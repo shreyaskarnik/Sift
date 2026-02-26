@@ -26,7 +26,7 @@ After building, load `dist/` as an unpacked extension in `chrome://extensions`.
 The build is a **dual-build system** via `build.mjs`:
 
 1. **Main Vite build** (`vite.config.ts`) — compiles `background.ts` as an ES module, bundling Transformers.js + ONNX WASM. Copies `public/` to `dist/`.
-2. **Sequential IIFE builds** — compiles popup and each content script (`hn-content`, `reddit-content`, `x-content`) as self-contained IIFEs with `inlineDynamicImports: true`.
+2. **Sequential IIFE builds** — compiles the side panel and each content script (`side-panel`, `hn-content`, `reddit-content`, `x-content`) as self-contained IIFEs with `inlineDynamicImports: true`.
 
 Content scripts **must** be IIFE format because Chrome loads them as classic scripts, not ES modules. Each IIFE build uses `publicDir: false` to avoid re-copying assets.
 
@@ -40,7 +40,7 @@ Path alias: `@shared` → `src/shared/`.
 Content Scripts ──chrome.runtime.sendMessage──► Background Service Worker
     (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                         │
-Popup ──────────chrome.runtime.sendMessage──────────────┘
+Side Panel ─────chrome.runtime.sendMessage──────────────┘
     (IIFE)         (GET_STATUS, CATEGORIES_CHANGED, etc.)
 ```
 
@@ -70,13 +70,13 @@ Inspector explanations are deterministic and generated from score band + lens/ti
 - **WebGPU vs WASM** — auto-detected at runtime. WebGPU uses `model_no_gather` variant for embedding model; WASM uses `model`.
 - **dtype `q4`** — Embedding model uses 4-bit quantization. Transformers.js auto-appends `_q4` to `model_file_name`.
 - **Custom model source** — A single "Model Source" input accepts either a HuggingFace model ID (e.g. `org/model-ONNX`) or a local server URL (e.g. `http://localhost:8000`). Auto-detected by `http(s)://` prefix; the two are mutually exclusive. Stored in `chrome.storage.local` as `CUSTOM_MODEL_ID` or `CUSTOM_MODEL_URL`. URLs set `env.remoteHost` for Transformers.js.
-- **Model status includes `modelId`** — `ModelStatus.modelId` broadcasts the resolved display name (URL for local, HF model ID for remote) so the popup shows which model is active.
+- **Model status includes `modelId`** — `ModelStatus.modelId` broadcasts the resolved display name (URL for local, HF model ID for remote) so the side panel shows which model is active.
 - The embedding model output key is `sentence_embedding` (normalized vectors), so cosine similarity reduces to a dot product.
 - **HF auth not supported browser-side** — Transformers.js v4 intentionally disables browser auth. Finetuned models must be public on HuggingFace Hub. ONNX files contain only numerical weights and tokenizer data — safe to publish.
 
 ## Service Worker Gotchas
 
-- **No `window` APIs** — `self.matchMedia()`, `document`, `localStorage` etc. are NOT available in MV3 service workers. Theme detection is done in popup (`popup.ts`) and content scripts (`widget.ts`) which have `window.matchMedia`, then persisted to `chrome.storage.local`. The background listens for storage changes to apply theme-aware icons via `chrome.action.setIcon()`.
+- **No `window` APIs** — `self.matchMedia()`, `document`, `localStorage` etc. are NOT available in MV3 service workers. Theme detection is done in the side panel (`side-panel.ts`) and content scripts (`widget.ts`) which have `window.matchMedia`, then persisted to `chrome.storage.local`. The background listens for storage changes to apply theme-aware icons via `chrome.action.setIcon()`.
 - **`chrome.runtime.sendMessage()` broadcasts** — Messages go to ALL extension contexts. The background ignores its own `MODEL_STATUS` messages to avoid loops.
 
 ## Data Quality

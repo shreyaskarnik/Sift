@@ -64,7 +64,7 @@ try {
   });
 } catch { /* non-critical */ }
 
-// Live-update when user changes settings in the popup
+// Live-update when user changes settings in the side panel
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes[STORAGE_KEYS.SENSITIVITY]) {
