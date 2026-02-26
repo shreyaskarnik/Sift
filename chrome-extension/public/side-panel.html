@@ -5,28 +5,1456 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sift</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      min-width: 320px;
-      color: #1a1a1a;
-      background: #fff;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-    @media (prefers-color-scheme: dark) {
-      body { color: #e0e0e0; background: #1a1a1a; }
-    }
-    .sp-loading {
-      padding: 32px 16px;
-      text-align: center;
-      color: #888;
-      font-size: 14px;
-    }
+/* ═══════════════════════════════════════════
+   Sift Side Panel
+   ═══════════════════════════════════════════ */
+
+/* ── Light (default) ── */
+:root {
+  --bg: #ffffff;
+  --surface: #f4f5f7;
+  --surface-2: #ebedf0;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text: #1a1c20;
+  --text-muted: #6b7280;
+  --text-dim: #9ca3af;
+  --accent: #059669;
+  --accent-dim: rgba(5, 150, 105, 0.1);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.08);
+  --warn: #d97706;
+  --radius: 8px;
+  --radius-sm: 5px;
+}
+
+/* ── Dark ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f11;
+    --surface: #181a1e;
+    --surface-2: #1e2025;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(255, 255, 255, 0.12);
+    --text: #e4e5e7;
+    --text-muted: #7a7d85;
+    --text-dim: #4e5058;
+    --accent: #34d399;
+    --accent-dim: rgba(52, 211, 153, 0.12);
+    --danger: #f87171;
+    --danger-dim: rgba(248, 113, 113, 0.1);
+    --warn: #fbbf24;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 320px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ── */
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sp-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-brand h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.sp-brand .version {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Status indicator */
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 8px 3px 6px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.status-dot.loading {
+  background: var(--warn);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--warn) 50%, transparent);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot.ready {
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.status-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-label {
+  color: var(--text-muted);
+}
+
+/* ── Progress Bar ── */
+
+#progress-bar-container {
+  width: 100%;
+  height: 3px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, white));
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── View Toggle Tabs ── */
+
+.view-tabs {
+  display: flex;
+  gap: 0;
+  margin: 8px 14px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.view-tab {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.view-tab:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.view-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.view-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* ── Body / Scrollable Area ── */
+
+.sp-body {
+  padding: 8px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hover) transparent;
+}
+
+.sp-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sp-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sp-body::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 3px;
+}
+
+.sp-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* ── Section Headers ── */
+
+.section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-badge {
+  font-size: 9px;
+  font-weight: 500;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-badge:empty {
+  display: none;
+}
+
+/* ── Section Cards ── */
+
+.sp-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 10px;
+}
+
+/* ── Hero Card (Current Page) ── */
+
+.hero-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.hero-card .page-score-card {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.hero-card:not(:has(.page-score-card.disabled)):not(:has(.page-score-card.loading)) {
+  border-left: 3px solid hsl(var(--ps-hue, 210), 70%, 50%);
+}
+
+.hero-card:has(.page-score-card.disabled) {
+  border-left: 3px dashed var(--text-dim);
+}
+
+/* Compact toggle for hero header */
+.toggle-compact {
+  gap: 0;
+  margin: 0;
+  font-size: 0;
+}
+
+/* ── Page Score Card ── */
+
+.page-score-card {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: background 0.3s;
+}
+
+.page-score-title {
+  font-size: 11.5px;
+  color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.page-score-card.disabled .page-score-title {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.page-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  animation: score-reveal 0.3s cubic-bezier(0.2, 0, 0.2, 1) both;
+}
+
+@keyframes score-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-score-band {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: hsla(var(--ps-hue, 210), 60%, 50%, 0.12);
+  color: hsl(var(--ps-hue, 210), 70%, 45%);
+}
+
+.page-score-value {
+  font-size: 18px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.page-score-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.page-score-actions button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.page-score-actions button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+}
+
+.page-score-actions button.voted {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.page-score-anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.page-score-anchor-pill {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.page-score-anchor-pill.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--accent-dim);
+}
+
+.page-score-anchor-pill:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-dim);
+}
+
+.page-score-anchor-pill:active {
+  transform: scale(0.95);
+}
+
+.page-score-explain {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+/* Loading shimmer */
+.page-score-card.loading .page-score-title {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+  color: transparent;
+  user-select: none;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Categories Grid ── */
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+}
+
+.category-group-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  grid-column: 1 / -1;
+}
+
+.category-chip {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  text-align: center;
+}
+
+.category-chip:hover {
+  border-color: var(--border-hover);
+  color: var(--text-muted);
+}
+
+.category-chip.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--accent-dim);
+}
+
+.category-chip.active:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.category-chip:active {
+  transform: scale(0.95);
+}
+
+.topk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.topk-row select {
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+}
+
+/* ── Muted Keywords ── */
+
+.muted-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+
+.muted-textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.muted-textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+.muted-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.muted-count {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.muted-count:empty {
+  display: none;
+}
+
+/* ── Taste Profile ── */
+
+.taste-empty,
+.taste-computing {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.taste-computing {
+  animation: taste-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes taste-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.taste-radar {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0;
+}
+
+.taste-radar svg {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+}
+
+.radar-grid {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.radar-axis {
+  stroke: var(--border);
+  stroke-width: 0.5;
+}
+
+.radar-polygon {
+  fill: rgba(52, 211, 153, 0.15);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.radar-dot {
+  fill: var(--accent);
+}
+
+.radar-label {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  fill: var(--text);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.radar-score-label {
+  font-size: 9px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  fill: var(--text-dim);
+  text-anchor: end;
+}
+
+.radar-hit-area {
+  fill: transparent;
+}
+
+.taste-full-link {
+  display: block;
+  margin-top: 4px;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.taste-full-link:hover {
+  opacity: 0.75;
+}
+
+.taste-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.taste-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ── Settings Section ── */
+
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.model-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.model-detail {
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-dim);
+}
+
+.model-id-display {
+  font-size: 10px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-dim);
+  padding: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-id-display:empty {
+  display: none;
+}
+
+/* ── Inputs ── */
+
+.setting-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  margin-top: 8px;
+}
+
+.setting-label:first-of-type {
+  margin-top: 0;
+}
+
+.setting-label small {
+  font-weight: 400;
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.input-row {
+  display: flex;
+  gap: 6px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input[type="text"]:focus {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+input[type="text"]::placeholder {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+/* ── Site Toggles ── */
+
+.toggle-row {
+  display: flex;
+  gap: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+.toggle input {
+  display: none;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle input:checked + .toggle-switch {
+  background: var(--accent-dim);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.toggle input:checked + .toggle-switch::after {
+  transform: translateX(12px);
+  background: var(--accent);
+}
+
+/* ── Slider ── */
+
+.slider-value {
+  float: right;
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-hint {
+  font-size: 9px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 1px var(--border-hover), 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ── Buttons ── */
+
+button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+button:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+button.danger {
+  color: var(--danger);
+  border-color: var(--danger-dim);
+  background: transparent;
+  margin-top: 8px;
+  width: 100%;
+  font-size: 11px;
+}
+
+button.danger:hover {
+  background: var(--danger-dim);
+  border-color: color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.btn-sm {
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-sm:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+}
+
+.button-group {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.button-group button,
+.button-group .file-input-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.button-group button:hover,
+.button-group .file-input-label:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+/* ── Training Data Stats ── */
+
+#label-counts {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.data-readiness {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+
+.data-readiness.ready {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-dim);
+}
+
+.anchor-gap-hints {
+  display: none;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.anchor-gap-hints.visible {
+  display: block;
+}
+
+.anchor-gap-title {
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+  font-weight: 600;
+}
+
+.anchor-gap-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.anchor-gap-item {
+  color: var(--text-muted);
+}
+
+.collect-link {
+  display: none;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.collect-link.visible {
+  display: inline-flex;
+}
+
+.collect-link:hover {
+  text-decoration: underline;
+}
+
+.labels-full-link {
+  display: block;
+  margin: 4px 0 8px;
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.labels-full-link:hover {
+  opacity: 0.75;
+}
+
+/* ── Toasts ── */
+
+.toast-container {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 11px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast.success {
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.toast.error {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.toast-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.toast-action:hover {
+  text-decoration: underline;
+  background: transparent;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Footer ── */
+
+.sp-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+
+.sp-footer p {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  line-height: 1.3;
+}
+
+/* ── Agent View ── */
+
+.agent-view {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 14px 10px;
+}
+
+.agent-view.active {
+  display: flex;
+}
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-header .agent-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.agent-status {
+  font-size: 10px;
+  color: var(--text-dim);
+  min-height: 14px;
+}
+
+.agent-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 32px 0;
+  text-align: center;
+}
+
+.btn-fetch {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-fetch:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.btn-fetch:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Story List (HN-like) ── */
+
+.story-list {
+  padding: 0;
+}
+
+.story-athing {
+  display: flex;
+  align-items: baseline;
+  padding: 2px 0 0;
+}
+
+.story-rank {
+  flex: 0 0 26px;
+  text-align: right;
+  padding-right: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.story-titleline {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.story-titleline a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.story-titleline a:visited {
+  color: var(--text-muted);
+}
+
+.story-titleline a:hover {
+  text-decoration: underline;
+}
+
+.story-domain {
+  font-size: 9.5px;
+  color: var(--text-dim);
+  margin-left: 5px;
+}
+
+.story-category {
+  font-size: 8.5px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.story-subtext {
+  display: flex;
+  align-items: baseline;
+  padding: 1px 0 5px;
+  margin-left: 32px;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.story-subline {
+  flex: 1;
+}
+
+.story-taste {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+/* ── Reduced Motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .page-score-row,
+  .page-score-card.loading .page-score-title,
+  .status-dot.loading,
+  .toast,
+  .taste-computing {
+    animation: none;
+  }
+
+  .toggle-switch::after,
+  .toggle-switch,
+  .status-dot {
+    transition: none;
+  }
+}
   </style>
 </head>
 <body>
-  <div class="sp-loading">Loading Sift…</div>
+  <!-- Header -->
+  <header class="sp-header">
+    <div class="sp-brand">
+      <h1>Sift</h1>
+      <span class="version">v0.1</span>
+    </div>
+    <div class="status-pill">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-label" class="status-label">&mdash;</span>
+    </div>
+  </header>
+
+  <!-- Progress Bar -->
+  <div id="progress-bar-container" style="display:none">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- View Toggle -->
+  <div class="view-tabs">
+    <button class="view-tab active" id="tab-scoring" type="button">Scoring</button>
+    <button class="view-tab" id="tab-agent" type="button">Agent</button>
+  </div>
+
+  <!-- ═══ Scoring View ═══ -->
+  <div class="sp-body" id="scoring-view">
+
+    <!-- Page Score Card -->
+    <div class="hero-card">
+      <div class="hero-header">
+        <span class="hero-label">Current Page</span>
+        <label class="toggle toggle-compact" title="Toggle page scoring">
+          <input type="checkbox" id="toggle-page-score">
+          <span class="toggle-switch"></span>
+        </label>
+      </div>
+      <div id="page-score-card" class="page-score-card disabled">
+        <div class="page-score-title" id="page-score-title">Enable scoring to see page relevance</div>
+        <div class="page-score-row" id="page-score-row" style="display:none">
+          <span class="page-score-band" id="page-score-band"></span>
+          <span class="page-score-value" id="page-score-value"></span>
+          <span class="page-score-actions" id="page-score-actions"></span>
+        </div>
+        <div class="page-score-anchors" id="page-score-anchors" style="display:none"></div>
+        <div class="page-score-explain" id="page-score-explain" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Categories -->
+    <div class="sp-section">
+      <div class="section-header">Categories <span id="category-count-badge" class="section-badge"></span></div>
+      <div class="topk-row">
+        <span>Show top</span>
+        <select id="topk-select">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="5">5</option>
+        </select>
+        <span>per item</span>
+      </div>
+      <div id="category-grid" class="category-grid"></div>
+    </div>
+
+    <!-- Muted Keywords -->
+    <div class="sp-section">
+      <div class="section-header">Muted Keywords <span id="muted-count" class="section-badge"></span></div>
+      <textarea id="muted-textarea" class="muted-textarea" placeholder="keyword1, keyword2, keyword3..." rows="3"></textarea>
+      <div class="muted-footer">
+        <span id="muted-count-display" class="muted-count"></span>
+        <button id="save-muted" class="btn-sm" type="button">Save</button>
+      </div>
+    </div>
+
+    <!-- Taste Profile -->
+    <div class="sp-section">
+      <div class="section-header">My Taste Profile <span id="taste-badge" class="section-badge"></span></div>
+      <div id="taste-empty" class="taste-empty">Label at least 10 items to see your taste profile.</div>
+      <div id="taste-results" style="display:none">
+        <div id="taste-radar" class="taste-radar"></div>
+        <a id="taste-full-link" class="taste-full-link" href="#">See full profile &rarr;</a>
+      </div>
+      <div id="taste-computing" class="taste-computing" style="display:none">Computing taste profile...</div>
+      <div class="taste-footer">
+        <span id="taste-meta" class="taste-meta"></span>
+        <button id="taste-refresh" class="btn-sm" style="display:none">Refresh</button>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="sp-section">
+      <div class="section-header">Settings</div>
+      <div class="model-row">
+        <span class="model-name">Scoring</span>
+        <span id="model-status" class="model-detail">Initializing...</span>
+      </div>
+      <div id="model-id-display" class="model-id-display"></div>
+
+      <div class="setting-label">Active Sites</div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggle-hn" checked><span class="toggle-switch"></span> HN</label>
+        <label class="toggle"><input type="checkbox" id="toggle-reddit" checked><span class="toggle-switch"></span> Reddit</label>
+        <label class="toggle"><input type="checkbox" id="toggle-x" checked><span class="toggle-switch"></span> X</label>
+      </div>
+
+      <div class="setting-label">Dimming <span id="sensitivity-value" class="slider-value">50%</span></div>
+      <div class="slider-row">
+        <span class="slider-hint">Subtle</span>
+        <input type="range" id="sensitivity-slider" min="0" max="100" value="50">
+        <span class="slider-hint">Aggressive</span>
+      </div>
+
+      <div class="setting-label">Model Source <small>(blank = default)</small></div>
+      <div class="input-row">
+        <input type="text" id="model-source-input" placeholder="org/model-ONNX or http://localhost:8000">
+        <button id="save-model-source">Apply</button>
+      </div>
+
+      <div class="sp-footer">
+        <p>Sift through the noise &mdash; powered by EmbeddingGemma.</p>
+      </div>
+    </div>
+
+    <!-- Training Data -->
+    <div class="sp-section">
+      <div class="section-header">Training Data <span id="label-count-badge" class="section-badge"></span></div>
+      <div id="label-counts">No labels collected yet.</div>
+      <div id="data-readiness" class="data-readiness"></div>
+      <div id="anchor-gap-hints" class="anchor-gap-hints" style="display:none"></div>
+      <a id="collect-link" class="collect-link" href="https://news.ycombinator.com/" target="_blank" rel="noreferrer">
+        Open an enabled site to collect labels
+      </a>
+      <a id="labels-full-link" class="labels-full-link" href="#">Manage labels &rarr;</a>
+      <div class="button-group">
+        <button id="export-csv">Export CSV</button>
+        <label class="file-input-label" for="import-x">
+          Import X Archive
+          <input type="file" id="import-x" accept=".js" multiple style="display:none">
+        </label>
+      </div>
+      <button id="clear-data" class="danger">Clear All Data</button>
+    </div>
+  </div>
+
+  <!-- ═══ Agent View ═══ -->
+  <div class="agent-view" id="agent-view">
+    <div class="agent-header">
+      <span class="agent-title">Your personalized HN feed</span>
+      <button class="btn-fetch" id="agent-fetch-btn" type="button">Fetch my feed</button>
+    </div>
+    <div class="agent-status" id="agent-status"></div>
+    <div id="agent-empty" class="agent-empty"></div>
+    <div id="agent-story-list" class="story-list"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
   <script src="side-panel.js"></script>
 </body>
 </html>
