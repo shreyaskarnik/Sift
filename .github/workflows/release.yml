@@ -31,3 +31,14 @@ jobs:
         with:
           files: sift-${{ github.ref_name }}.zip
           generate_release_notes: true
+          body: |
+            ## Install
+
+            1. Download **sift-${{ github.ref_name }}.zip** from the assets below
+            2. Unzip the file
+            3. Open `chrome://extensions` in Chrome
+            4. Enable **Developer Mode** (toggle in the top-right corner)
+            5. Click **Load unpacked** and select the `dist/` folder from the unzipped archive
+            6. Pin Sift from the extensions toolbar — you're ready to go
+
+            > **First time?** Open the Sift popup, pick your interests, then browse Hacker News, Reddit, or X to see scoring in action.
