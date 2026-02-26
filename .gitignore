@@ -24,6 +24,7 @@ Thumbs.db
 # Video generation (intermediate)
 video-frames/
 .video-chrome-profile/
+.screenshot-chrome-profile/
 
 # Python build
 build/
