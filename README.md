@@ -53,8 +53,8 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 - Scores HN, Reddit, and X feeds with ambient opacity dimming
 - Per-site toggles and sensitivity slider
 - 25 built-in categories across tech, world, and lifestyle groups (user-defined categories coming soon)
-- **Auto-detected category pills** — popup hero card and feed inspector show which categories match the current page/item
-- **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; top-5 preview in popup, full-page view with category chips and ranked bars
+- **Auto-detected category pills** — side panel hero card and feed inspector show which categories match the current page/item
+- **Taste profile** — contrastive centroid of your positive/negative labels scored against ~100 curated probe phrases; preview in side panel, full-page view with category chips and ranked bars
 - **Interactive radar chart** — SVG spider chart of your taste across all categories; click any axis to drill into that category's sub-topic probes
 - Thumbs up/down training labels with per-anchor CSV export
 - **Label Manager** — full-page view to filter, inline-edit, reassign categories, and add labels by URL (auto-fetches title + suggests best category)
@@ -89,7 +89,7 @@ python train.py data.csv --push-to-hub your-username/sift-finetuned
 # Also valid: --push-to-hub sift-finetuned (auto-uses your username)
 ```
 
-Then set the model ID in the extension popup. No authentication is needed for public models.
+Then set the model ID in the extension side panel. No authentication is needed for public models.
 
 For private/development models, use the local server instead (`python train.py --serve`).
 
@@ -133,7 +133,7 @@ python train.py --convert-only path/to/saved_model
 python train.py --serve path/to/onnx_output --port 8000
 ```
 
-Set `Custom Model URL` to `http://localhost:8000` in the extension popup to test your fine-tuned model.
+Set `Custom Model URL` to `http://localhost:8000` in the extension side panel to test your fine-tuned model.
 
 ### Training Data Format
 
@@ -151,13 +151,13 @@ MY_FAVORITE_NEWS,"Rust is eating the world","Bitcoin drops 10%"
 Content Scripts ──chrome.runtime.sendMessage──▸ Background Service Worker
     (IIFE)       (SCORE_TEXTS, EXPLAIN_SCORE)       (ES module)
                                                        │
-Popup ──────────chrome.runtime.sendMessage─────────────┘
-    (IIFE)         (GET_STATUS, CATEGORIES_CHANGED)
+Side Panel ─────chrome.runtime.sendMessage─────────────┘
+    (IIFE)         (GET_STATUS, GET_PAGE_SCORE, COMPUTE_TASTE_PROFILE)
 ```
 
 - **Background** — Loads EmbeddingGemma via Transformers.js, manages scoring + deterministic inspector rationale, routes messages, stores labels
 - **Content scripts** — Site-specific DOM selectors, MutationObserver for infinite scroll, debounced scoring
-- **Popup** — Settings, category toggles, sensitivity slider, taste profile preview, data export
+- **Side panel** — Settings, category toggles, sensitivity slider, taste profile preview, training data tools, agent view toggle
 - **Taste page** — Full-width taste profile viewer (`taste.html`), reads cached profile from storage
 
 ## Project Structure
@@ -169,12 +169,12 @@ Popup ──────────chrome.runtime.sendMessage──────
 ├── src/                        # Python modules (config, trainer, vibe logic)
 └── chrome-extension/
     ├── build.mjs               # Dual-build (Vite + IIFE content scripts)
-    ├── public/                 # manifest.json, popup HTML/CSS, icons
+    ├── public/                 # manifest.json, side-panel HTML, pages, icons
     └── src/
         ├── background/         # Service worker (model + message routing)
         ├── content/            # HN, Reddit, X content scripts
         │   └── common/         # Shared: batch scorer, styles, widget, labels
-        ├── popup/              # Popup UI
+        ├── side-panel/         # Side panel UI
         ├── labels/             # Label Manager (full-page label editor)
         ├── taste/              # Full-page taste profile viewer
         ├── agent/              # Agent mode: taste-ranked HN feed (experimental)
