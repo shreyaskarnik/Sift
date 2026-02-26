@@ -138,6 +138,7 @@ export const STORAGE_KEYS = {
   TASTE_PROFILE: "taste_profile",
   EMBEDDING_CACHE: "embedding_cache",
   MUTED_KEYWORDS: "muted_keywords",
+  ONBOARDING_DISMISSED: "onboarding_dismissed",
 } as const;
 
 /** Default number of category pills shown per scored item */

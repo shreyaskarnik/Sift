@@ -521,6 +521,19 @@ body {
   transform: scale(0.95);
 }
 
+/* ── Onboarding Hint ── */
+
+.onboarding-hint {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 .topk-row {
   display: flex;
   align-items: center;
@@ -1348,6 +1361,9 @@ button.danger:hover {
     <!-- Categories -->
     <div class="sp-section">
       <div class="section-header">Categories <span id="category-count-badge" class="section-badge"></span></div>
+      <div id="onboarding-hint" class="onboarding-hint" style="display:none">
+        Pick your interests below, then browse HN, Reddit, or X to see scoring in action.
+      </div>
       <div class="topk-row">
         <span>Show top</span>
         <select id="topk-select">
