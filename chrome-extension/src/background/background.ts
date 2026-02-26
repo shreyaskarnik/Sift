@@ -1089,6 +1089,9 @@ chrome.storage.onChanged.addListener((changes) => {
 loadModels();
 loadMutedKeywords();
 
+// Open the side panel (instead of a popup) when the extension icon is clicked.
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
 // ---------------------------------------------------------------------------
 // Message routing
 // ---------------------------------------------------------------------------

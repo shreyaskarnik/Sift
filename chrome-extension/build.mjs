@@ -19,6 +19,7 @@ const iifeEntries = [
   { name: "taste", entry: resolve(__dirname, "src/taste/taste.ts") },
   { name: "labels", entry: resolve(__dirname, "src/labels/labels.ts") },
   { name: "agent", entry: resolve(__dirname, "src/agent/agent.ts") },
+  { name: "side-panel", entry: resolve(__dirname, "src/side-panel/side-panel.ts") },
   { name: "hn-content", entry: resolve(__dirname, "src/content/hn/hn-content.ts") },
   { name: "reddit-content", entry: resolve(__dirname, "src/content/reddit/reddit-content.ts") },
   { name: "x-content", entry: resolve(__dirname, "src/content/x/x-content.ts") },
