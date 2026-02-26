@@ -33,6 +33,7 @@ import {
   TASTE_NEG_ALPHA,
   TASTE_MIN_NEGATIVES,
   EMBED_TASK_PREFIX,
+  EMBEDDING_CACHE_MAX,
 } from "../shared/constants";
 import type {
   AgentStory,
@@ -57,6 +58,7 @@ import type {
   UpdateLabelPayload,
   DeleteLabelPayload,
   FetchPageTitlePayload,
+  EmbeddingCacheEntry,
 } from "../shared/types";
 import { scoreToHue, normalizeTitle } from "../shared/scoring-utils";
 import { TASTE_PROBES } from "../shared/taste-probes";
@@ -104,6 +106,46 @@ let loadingPromise: Promise<void> | null = null;
 const presetEmbeddings = new Map<string, Float32Array>();
 let categoriesVersion = 0;
 let currentCategoryMap: CategoryMap = {};
+
+// ---------------------------------------------------------------------------
+// Embedding cache (chrome.storage.local)
+// ---------------------------------------------------------------------------
+
+let embeddingCache: Record<string, EmbeddingCacheEntry> | null = null;
+let currentModelIdForCache = "";
+
+function cacheKey(text: string): string {
+  // djb2 hash — compact key for storage
+  let h = 5381;
+  const s = EMBED_TASK_PREFIX + text;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+async function loadEmbeddingCache(): Promise<Record<string, EmbeddingCacheEntry>> {
+  if (embeddingCache !== null) return embeddingCache;
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.EMBEDDING_CACHE);
+  embeddingCache = (stored[STORAGE_KEYS.EMBEDDING_CACHE] as Record<string, EmbeddingCacheEntry>) ?? {};
+  return embeddingCache;
+}
+
+async function flushEmbeddingCache(): Promise<void> {
+  if (!embeddingCache) return;
+  await chrome.storage.local.set({ [STORAGE_KEYS.EMBEDDING_CACHE]: embeddingCache });
+}
+
+function evictOldestEntries(cache: Record<string, EmbeddingCacheEntry>, max: number): void {
+  const keys = Object.keys(cache);
+  if (keys.length <= max) return;
+  const sorted = keys.sort((a, b) => cache[a].timestamp - cache[b].timestamp);
+  const toRemove = sorted.slice(0, keys.length - max);
+  for (const k of toRemove) delete cache[k];
+}
+
+async function clearEmbeddingCache(): Promise<void> {
+  embeddingCache = {};
+  await chrome.storage.local.remove(STORAGE_KEYS.EMBEDDING_CACHE);
+}
 
 // Restore persisted categoriesVersion so content scripts don't ignore broadcasts
 // after a service-worker restart.
@@ -234,6 +276,7 @@ async function loadEmbeddingModel(): Promise<void> {
       tokenizer = loadedTokenizer;
       model = loadedModel;
       modelReady = true;
+      currentModelIdForCache = displayModelId;
 
       console.log(`[bg] Embedding model ready (${device})`);
       broadcastStatus({ state: "ready", backend: device });
@@ -355,6 +398,48 @@ async function embed(texts: string[]): Promise<Float32Array[]> {
     embeddings.push(new Float32Array(rawData.slice(start, start + embDim)));
   }
   return embeddings;
+}
+
+/**
+ * Cache-aware embedding: returns cached embeddings for known texts,
+ * calls embed() only for cache misses, then persists new entries.
+ */
+async function getOrEmbed(texts: string[]): Promise<Float32Array[]> {
+  const cache = await loadEmbeddingCache();
+  const results: (Float32Array | null)[] = new Array(texts.length).fill(null);
+  const missIndices: number[] = [];
+  const missTexts: string[] = [];
+
+  for (let i = 0; i < texts.length; i++) {
+    const key = cacheKey(texts[i]);
+    const entry = cache[key];
+    if (entry && entry.modelId === currentModelIdForCache) {
+      results[i] = new Float32Array(entry.embedding);
+      entry.timestamp = Date.now(); // touch for LRU
+    } else {
+      missIndices.push(i);
+      missTexts.push(texts[i]);
+    }
+  }
+
+  if (missTexts.length > 0) {
+    const fresh = await embed(missTexts);
+    const now = Date.now();
+    for (let j = 0; j < missIndices.length; j++) {
+      const idx = missIndices[j];
+      results[idx] = fresh[j];
+      const key = cacheKey(missTexts[j]);
+      cache[key] = {
+        embedding: Array.from(fresh[j]),
+        modelId: currentModelIdForCache,
+        timestamp: now,
+      };
+    }
+    evictOldestEntries(cache, EMBEDDING_CACHE_MAX);
+    flushEmbeddingCache(); // fire-and-forget
+  }
+
+  return results as Float32Array[];
 }
 
 function cosineSimilarity(a: Float32Array, b: Float32Array): number {
@@ -870,7 +955,7 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
     }
 
     // Single embed call — reuse vector for both main score and preset ranking
-    const [textEmb] = await embed([norm]);
+    const [textEmb] = await getOrEmbed([norm]);
     const ranking = rankPresets(textEmb);
     const score = ranking ? ranking.top.score : cosineSimilarity(anchorEmbedding!, textEmb);
     const result = mapScoreToVibe(norm, score);
@@ -966,6 +1051,11 @@ chrome.storage.onChanged.addListener((changes) => {
     if (!modelReady) return;
     void embedActiveCategories();
   }
+
+  // Model source changed — invalidate embedding cache
+  if (changes[STORAGE_KEYS.CUSTOM_MODEL_ID] || changes[STORAGE_KEYS.CUSTOM_MODEL_URL]) {
+    clearEmbeddingCache();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1092,7 @@ chrome.runtime.onMessage.addListener(
         model = null;
         anchorEmbedding = null;
         presetEmbeddings.clear();
+        clearEmbeddingCache();
         currentCategoryMap = {};
         modelReady = false;
         anchorReady = false;
@@ -1026,7 +1117,7 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ error: "Model not ready" });
           return;
         }
-        embed(p.texts)
+        getOrEmbed(p.texts)
           .then((embeddings) => {
             const rankings = embeddings.map((emb) => rankPresets(emb));
             const results = p.texts.map((text, i) => {
@@ -1359,7 +1450,7 @@ chrome.runtime.onMessage.addListener(
           const titleEmbeddings: Float32Array[] = [];
           for (let i = 0; i < titles.length; i += SCORE_BATCH_SIZE) {
             const batch = titles.slice(i, i + SCORE_BATCH_SIZE);
-            const embs = await embed(batch);
+            const embs = await getOrEmbed(batch);
             for (const e of embs) titleEmbeddings.push(l2Normalize(e));
           }
 
