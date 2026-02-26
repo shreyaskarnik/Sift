@@ -137,6 +137,7 @@ export const STORAGE_KEYS = {
   TOP_K_PILLS: "top_k_pills",
   TASTE_PROFILE: "taste_profile",
   EMBEDDING_CACHE: "embedding_cache",
+  MUTED_KEYWORDS: "muted_keywords",
 } as const;
 
 /** Default number of category pills shown per scored item */
@@ -153,6 +154,9 @@ export const SCORE_BATCH_SIZE = 16;
 
 /** Maximum number of cached embeddings in chrome.storage.local */
 export const EMBEDDING_CACHE_MAX = 2000;
+
+/** Maximum number of muted keywords */
+export const MUTED_KEYWORDS_MAX = 200;
 
 /** Minimum positive labels required to compute a taste profile */
 export const TASTE_MIN_LABELS = 10;
