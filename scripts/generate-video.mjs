@@ -71,8 +71,14 @@ function findChromium() {
       .reverse();
     for (const d of dirs) {
       const candidates = [
-        join(d, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
-        join(d, "chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        join(
+          d,
+          "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        ),
+        join(
+          d,
+          "chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        ),
         join(d, "chrome-linux64/chrome"),
         join(d, "chrome-linux/chrome"),
       ];
@@ -91,7 +97,10 @@ function getArg(name, fallback) {
   const idx = args.indexOf(`--${name}`);
   return idx >= 0 && args[idx + 1] ? args[idx + 1] : fallback;
 }
-const OUT = getArg("out", join(ROOT, "docs", "assets", "video-output", "sift-demo.webm"));
+const OUT = getArg(
+  "out",
+  join(ROOT, "docs", "assets", "video-output", "sift-demo.webm"),
+);
 const FPS = Number(getArg("fps", "2"));
 const WIDTH = Number(getArg("width", "1280"));
 const HEIGHT = Number(getArg("height", "800"));
@@ -124,18 +133,38 @@ const LOGO_DATA_URI = `data:image/png;base64,${readFileSync(LOGO_PATH).toString(
 
 // All 25 built-in category labels for the word cloud
 const CATEGORY_LABELS = [
-  "News", "AI Research", "Startups", "Deep Tech", "Science",
-  "Programming", "Open Source", "Security & Privacy", "Design & UX",
-  "Product & SaaS", "Finance & Markets", "Crypto & Web3", "Politics",
-  "Legal & Policy", "Climate & Energy", "Space & Aerospace",
-  "Health & Biotech", "Education", "Gaming", "Sports", "Music",
-  "Culture & Arts", "Food & Cooking", "Travel", "Parenting",
+  "News",
+  "AI Research",
+  "Startups",
+  "Deep Tech",
+  "Science",
+  "Programming",
+  "Open Source",
+  "Security & Privacy",
+  "Design & UX",
+  "Product & SaaS",
+  "Finance & Markets",
+  "Crypto & Web3",
+  "Politics",
+  "Legal & Policy",
+  "Climate & Energy",
+  "Space & Aerospace",
+  "Health & Biotech",
+  "Education",
+  "Gaming",
+  "Sports",
+  "Music",
+  "Culture & Arts",
+  "Food & Cooking",
+  "Travel",
+  "Parenting",
 ];
 
 // Deterministic pseudo-random from seed (for reproducible layouts)
 function mulberry32(seed) {
   return function () {
-    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -147,19 +176,23 @@ function wordCloudHTML() {
   const spans = [];
   // Place each label with seeded random position, size, and opacity
   for (const label of CATEGORY_LABELS) {
-    const x = 5 + rng() * 85;       // 5-90% from left
-    const y = 5 + rng() * 85;       // 5-90% from top
-    const size = 13 + rng() * 9;    // 13-22px
+    const x = 5 + rng() * 85; // 5-90% from left
+    const y = 5 + rng() * 85; // 5-90% from top
+    const size = 13 + rng() * 9; // 13-22px
     const opacity = 0.04 + rng() * 0.06; // 0.04-0.10
-    const rotate = (rng() - 0.5) * 12;   // -6 to +6 degrees
+    const rotate = (rng() - 0.5) * 12; // -6 to +6 degrees
     spans.push(
-      `<span style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;font-size:${size.toFixed(0)}px;opacity:${opacity.toFixed(2)};transform:rotate(${rotate.toFixed(1)}deg)">${label}</span>`
+      `<span style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;font-size:${size.toFixed(0)}px;opacity:${opacity.toFixed(2)};transform:rotate(${rotate.toFixed(1)}deg)">${label}</span>`,
     );
   }
   return `<div class="word-cloud">${spans.join("\n    ")}</div>`;
 }
 
-function titleCardHTML(title, subtitle, { logo = false, poweredBy = false, wordCloud = false } = {}) {
+function titleCardHTML(
+  title,
+  subtitle,
+  { logo = false, poweredBy = false, wordCloud = false } = {},
+) {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -331,7 +364,7 @@ function buildScenes() {
       type: "title",
       html: titleCardHTML(
         '<span class="accent">Sift</span>',
-        "Score your feed with EmbeddingGemma v0.2 — side panel, smart caching, muted keywords.",
+        "Score your feed with EmbeddingGemma<br>v0.2 — side panel, smart caching, muted keywords.",
         { logo: true, poweredBy: true },
       ),
       hold: TITLE_HOLD_SEC,
@@ -361,7 +394,8 @@ function buildScenes() {
     {
       type: "screenshot",
       file: ss("hn-after.png"),
-      annotation: "After — low-relevance dimmed, muted items hidden, scores + inspector visible",
+      annotation:
+        "After — low-relevance dimmed, muted items hidden, scores + inspector visible",
       hold: HOLD_SEC + 1,
     },
 
@@ -419,13 +453,6 @@ function buildScenes() {
       ),
       hold: TITLE_HOLD_SEC,
     },
-    {
-      type: "screenshot",
-      file: ss("muted-keywords.png"),
-      annotation: 'Muted "crypto" — matching items at 8% opacity, zero compute spent',
-      hold: HOLD_SEC + 1,
-    },
-
     // ── Embedding Cache ──
     {
       type: "title",
@@ -448,7 +475,8 @@ function buildScenes() {
     {
       type: "screenshot",
       file: ss("taste.png"),
-      annotation: "Radar chart + ranked probes — your top interests by affinity",
+      annotation:
+        "Radar chart + ranked probes — your top interests by affinity",
       hold: HOLD_SEC + 1,
     },
 
@@ -464,7 +492,8 @@ function buildScenes() {
     {
       type: "screenshot",
       file: ss("label-manager.png"),
-      annotation: "Filter by category/polarity/source · inline edit · reassign categories",
+      annotation:
+        "Filter by category/polarity/source · inline edit · reassign categories",
       hold: HOLD_SEC + 1,
     },
     {
@@ -513,7 +542,9 @@ async function main() {
   console.log("🎬 Sift Video Generator (screenshot mode)");
   console.log(`   Output:     ${OUT}`);
   console.log(`   Viewport:   ${WIDTH}x${HEIGHT} @${SCALE}x → ${PX_W}x${PX_H}`);
-  console.log(`   FPS: ${FPS}, Hold: ${HOLD_SEC}s, Title hold: ${TITLE_HOLD_SEC}s`);
+  console.log(
+    `   FPS: ${FPS}, Hold: ${HOLD_SEC}s, Title hold: ${TITLE_HOLD_SEC}s`,
+  );
   console.log();
 
   // Validate ffmpeg
@@ -532,13 +563,21 @@ async function main() {
     console.log(`\n📁 Created ${SCREENSHOTS_DIR}/`);
     console.log("   Place your screenshots there and re-run. Expected files:");
     console.log("     hn-before.png       — Raw HN feed (no Sift)");
-    console.log("     hn-after.png        — HN with scoring + dimming + inspector");
+    console.log(
+      "     hn-after.png        — HN with scoring + dimming + inspector",
+    );
     console.log("     side-panel.png      — Side panel open alongside a feed");
-    console.log("     muted-keywords.png  — HN with muted keywords at low opacity");
+    console.log(
+      "     muted-keywords.png  — HN with muted keywords at low opacity",
+    );
     console.log("     reddit.png          — Reddit with scoring + inspector");
     console.log("     x.png              — X/Twitter with scoring + inspector");
-    console.log("     techcrunch.png      — TechCrunch article with side panel");
-    console.log("     taste.png           — Taste Profile page with radar chart");
+    console.log(
+      "     techcrunch.png      — TechCrunch article with side panel",
+    );
+    console.log(
+      "     taste.png           — Taste Profile page with radar chart",
+    );
     console.log("     label-manager.png   — Label Manager page");
     process.exit(0);
   }
@@ -548,7 +587,10 @@ async function main() {
   // Check which files exist
   const missingScreenshots = [];
   for (const scene of scenes) {
-    if ((scene.type === "screenshot" || scene.type === "html") && !existsSync(scene.file)) {
+    if (
+      (scene.type === "screenshot" || scene.type === "html") &&
+      !existsSync(scene.file)
+    ) {
       missingScreenshots.push(scene.file.replace(SCREENSHOTS_DIR + "/", ""));
     }
   }
@@ -589,9 +631,7 @@ async function main() {
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     const label =
-      scene.annotation ||
-      (scene.file || "").split("/").pop() ||
-      scene.type;
+      scene.annotation || (scene.file || "").split("/").pop() || scene.type;
     console.log(`  [${i + 1}/${scenes.length}] ${scene.type}: ${label}`);
 
     switch (scene.type) {
@@ -676,11 +716,16 @@ async function main() {
       path: OUT.replace(/\.\w+$/, ".mp4"),
       args: [
         ...inputArgs,
-        "-c:v", "libx264",
-        "-preset", "slow",
-        "-crf", "18",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "slow",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
       ],
       label: "MP4 (H.264)",
     },
@@ -688,9 +733,12 @@ async function main() {
       path: OUT,
       args: [
         ...inputArgs,
-        "-c:v", "libvpx-vp9",
-        "-b:v", "5M",
-        "-pix_fmt", "yuv420p",
+        "-c:v",
+        "libvpx-vp9",
+        "-b:v",
+        "5M",
+        "-pix_fmt",
+        "yuv420p",
       ],
       label: "WebM (VP9)",
     },
