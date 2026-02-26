@@ -297,6 +297,10 @@ async function main() {
 
   // ─── Capture side panel ─────────────────────────────────────────────────
   console.log("📷 Capturing side panel...");
+  // Expand all collapsible <details> sections so content is visible
+  await page.evaluate(() => {
+    document.querySelectorAll("details.sp-fold").forEach((d) => d.setAttribute("open", ""));
+  });
   await page.setViewportSize({ width: PANEL_WIDTH, height: HEIGHT });
   await page.waitForTimeout(500);
   const panelScreenshot = join(OUT_DIR, "_side-panel-raw.png");
@@ -341,6 +345,11 @@ async function main() {
   const mutedMock = buildMockState({ mutedKeywords: ["crypto", "bitcoin"] });
   await injectMockState(page, extId, mutedMock);
 
+  await page.evaluate(() => {
+    document.querySelectorAll("details.sp-fold").forEach((d) => d.setAttribute("open", ""));
+    // Scroll to show the Muted Keywords section
+    document.querySelector("#muted-textarea")?.scrollIntoView({ block: "center" });
+  });
   await page.setViewportSize({ width: PANEL_WIDTH, height: HEIGHT });
   await page.waitForTimeout(500);
   const mutedPanelScreenshot = join(OUT_DIR, "_side-panel-muted-raw.png");
@@ -357,8 +366,37 @@ async function main() {
   await page.screenshot({ path: mutedOut, type: "png" });
   console.log(`   ✅ ${mutedOut}\n`);
 
+  // ─── TechCrunch composite ──────────────────────────────────────────────
+  console.log("📷 Capturing TechCrunch background...");
+  const tcScreenshot = join(OUT_DIR, "_techcrunch-raw.png");
+  try {
+    await page.goto("https://techcrunch.com/2026/02/25/nvidia-earnings-record-capex-spend-ai/", {
+      waitUntil: "domcontentloaded",
+      timeout: 15000,
+    });
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: tcScreenshot, type: "png" });
+    console.log("   ✅ TechCrunch captured");
+  } catch (err) {
+    console.log(`   ⚠ TechCrunch unreachable (${err.message}), using dark placeholder`);
+    const placeholderHtml = `<html><body style="width:${WIDTH}px;height:${HEIGHT}px;background:#1a1b1d;margin:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#666;font-size:14px;">techcrunch.com</body></html>`;
+    await page.setContent(placeholderHtml, { waitUntil: "load" });
+    await page.screenshot({ path: tcScreenshot, type: "png" });
+  }
+
+  console.log("🧩 Compositing techcrunch.png...");
+  const tcCompositeHtml = compositeHTML(
+    tcScreenshot, panelScreenshot, WIDTH, HEIGHT, PANEL_WIDTH,
+  );
+  writeFileSync(tmpHtml, tcCompositeHtml);
+  await page.goto(`file://${tmpHtml}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1000);
+  const tcOut = join(OUT_DIR, "techcrunch.png");
+  await page.screenshot({ path: tcOut, type: "png" });
+  console.log(`   ✅ ${tcOut}\n`);
+
   // ─── Cleanup intermediate files ─────────────────────────────────────────
-  for (const tmp of [panelScreenshot, hnScreenshot, mutedPanelScreenshot, tmpHtml]) {
+  for (const tmp of [panelScreenshot, hnScreenshot, mutedPanelScreenshot, tcScreenshot, tmpHtml]) {
     if (existsSync(tmp)) rmSync(tmp);
   }
 
