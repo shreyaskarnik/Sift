@@ -147,6 +147,23 @@ async function clearEmbeddingCache(): Promise<void> {
   await chrome.storage.local.remove(STORAGE_KEYS.EMBEDDING_CACHE);
 }
 
+// ---------------------------------------------------------------------------
+// Muted keywords
+// ---------------------------------------------------------------------------
+
+let mutedKeywords: string[] = [];
+
+async function loadMutedKeywords(): Promise<void> {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.MUTED_KEYWORDS);
+  mutedKeywords = (stored[STORAGE_KEYS.MUTED_KEYWORDS] as string[]) ?? [];
+}
+
+function textMatchesMutedKeyword(text: string): boolean {
+  if (mutedKeywords.length === 0) return false;
+  const lower = text.toLowerCase();
+  return mutedKeywords.some((kw) => lower.includes(kw));
+}
+
 // Restore persisted categoriesVersion so content scripts don't ignore broadcasts
 // after a service-worker restart.
 chrome.storage.local.get(STORAGE_KEYS.CATEGORIES_VERSION).then((stored) => {
@@ -1056,6 +1073,11 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes[STORAGE_KEYS.CUSTOM_MODEL_ID] || changes[STORAGE_KEYS.CUSTOM_MODEL_URL]) {
     clearEmbeddingCache();
   }
+
+  // Muted keywords changed — reload in-memory list
+  if (changes[STORAGE_KEYS.MUTED_KEYWORDS]) {
+    loadMutedKeywords();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1065,6 +1087,7 @@ chrome.storage.onChanged.addListener((changes) => {
 // ---------------------------------------------------------------------------
 
 loadModels();
+loadMutedKeywords();
 
 // ---------------------------------------------------------------------------
 // Message routing
@@ -1117,18 +1140,48 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ error: "Model not ready" });
           return;
         }
-        getOrEmbed(p.texts)
+
+        // Partition: muted (filtered) vs clean
+        const cleanIndices: number[] = [];
+        const cleanTexts: string[] = [];
+        const allResults: VibeResult[] = new Array(p.texts.length);
+        const allRankings: (PresetRanking | undefined)[] = new Array(p.texts.length);
+
+        for (let i = 0; i < p.texts.length; i++) {
+          if (textMatchesMutedKeyword(p.texts[i])) {
+            allResults[i] = {
+              text: p.texts[i],
+              rawScore: -1,
+              status: "FILTERED",
+              emoji: "\u{1F6AB}",
+              colorHSL: "hsl(0, 0%, 40%)",
+              filtered: true,
+            };
+            allRankings[i] = undefined;
+          } else {
+            cleanIndices.push(i);
+            cleanTexts.push(p.texts[i]);
+          }
+        }
+
+        if (cleanTexts.length === 0) {
+          sendResponse({ results: allResults, rankings: allRankings });
+          return;
+        }
+
+        getOrEmbed(cleanTexts)
           .then((embeddings) => {
-            const rankings = embeddings.map((emb) => rankPresets(emb));
-            const results = p.texts.map((text, i) => {
-              const ranking = rankings[i];
-              const score = ranking ? ranking.top.score : cosineSimilarity(anchorEmbedding!, embeddings[i]);
-              return mapScoreToVibe(text, score);
-            });
-            sendResponse({ results, rankings });
+            for (let j = 0; j < cleanIndices.length; j++) {
+              const idx = cleanIndices[j];
+              const ranking = rankPresets(embeddings[j]);
+              const score = ranking ? ranking.top.score : cosineSimilarity(anchorEmbedding!, embeddings[j]);
+              allResults[idx] = mapScoreToVibe(cleanTexts[j], score);
+              allRankings[idx] = ranking;
+            }
+            sendResponse({ results: allResults, rankings: allRankings });
           })
           .catch((err) => sendResponse({ error: String(err) }));
-        return true; // keep channel open
+        return true; // keep channel open for async
       }
 
       case MSG.EXPLAIN_SCORE: {
