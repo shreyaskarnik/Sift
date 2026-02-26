@@ -183,7 +183,7 @@ export interface TasteProbeResult {
 }
 
 /** Response from COMPUTE_TASTE_PROFILE.
- * "loading" is a popup-only UI state (never emitted by background). */
+ * "loading" is a side-panel-only UI state (never emitted by background). */
 export interface TasteProfileResponse {
   state: "loading" | "ready" | "insufficient_labels" | "error";
   message?: string;

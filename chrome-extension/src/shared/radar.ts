@@ -1,6 +1,6 @@
 /**
  * Shared radar chart renderer (pure SVG, no dependencies).
- * Used by both popup (compact) and full-page taste view.
+ * Used by both side panel (compact) and full-page taste view.
  */
 import type { TasteProbeResult, CategoryMap, AggregatedCategory, RadarRenderResult } from "./types";
 

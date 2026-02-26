@@ -72,7 +72,7 @@ import { migrateLabels } from "./migrations";
 env.allowLocalModels = false;
 
 // ---------------------------------------------------------------------------
-// Theme-aware icon (set from popup/content scripts via storage)
+// Theme-aware icon (set from side panel/content scripts via storage)
 // ---------------------------------------------------------------------------
 
 function applyThemeIcon(dark: boolean): void {
@@ -204,7 +204,7 @@ function broadcastStatus(status: Partial<ModelStatus>): void {
     return;
   }
 
-  // Throttle loading/progress updates to avoid popup flicker
+  // Throttle loading/progress updates to avoid side panel flicker
   const now = Date.now();
   if (now - lastBroadcastTime >= BROADCAST_THROTTLE_MS) {
     if (pendingBroadcast) { clearTimeout(pendingBroadcast); pendingBroadcast = null; }
@@ -986,7 +986,7 @@ async function scorePageTitle(tabId: number): Promise<PageScoreCacheEntry | null
     pageScoreCache.set(tabId, entry);
     updateBadge(tabId, result);
 
-    // Broadcast to popup
+    // Broadcast to side panel
     const updated: PageScoreUpdatedPayload = {
       tabId, title, normalizedTitle: norm, result, ranking, state: "ready",
     };
