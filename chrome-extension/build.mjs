@@ -2,7 +2,7 @@
 /**
  * Build script:
  * 1. Main build — background service worker (bundles Transformers.js + ONNX WASM)
- * 2. IIFE builds — popup + content scripts (self-contained, no external imports)
+ * 2. IIFE builds — side panel + content scripts (self-contained, no external imports)
  */
 import { build } from "vite";
 import { resolve, dirname } from "path";
@@ -13,9 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // 1. Main build (background with Transformers.js — copies public/ to dist/)
 await build({ configFile: resolve(__dirname, "vite.config.ts") });
 
-// 2. Popup + content scripts as self-contained IIFEs
+// 2. Side panel + content scripts as self-contained IIFEs
 const iifeEntries = [
-  { name: "popup", entry: resolve(__dirname, "src/popup/popup.ts") },
   { name: "taste", entry: resolve(__dirname, "src/taste/taste.ts") },
   { name: "labels", entry: resolve(__dirname, "src/labels/labels.ts") },
   { name: "agent", entry: resolve(__dirname, "src/agent/agent.ts") },
