@@ -86,6 +86,7 @@ const pageScoreExplain = document.getElementById("page-score-explain")!;
 const labelCountBadge = document.getElementById("label-count-badge")!;
 const categoryGrid = document.getElementById("category-grid")!;
 const categoryCountBadge = document.getElementById("category-count-badge")!;
+const onboardingHint = document.getElementById("onboarding-hint")!;
 const tasteEmpty = document.getElementById("taste-empty") as HTMLDivElement;
 const tasteResults = document.getElementById("taste-results") as HTMLDivElement;
 const tasteRadar = document.getElementById("taste-radar") as HTMLDivElement;
@@ -151,6 +152,7 @@ let lastLabels: TrainingLabel[] = [];
 let lastLabelStats: LabelStats = EMPTY_STATS;
 let topKPills: number = DEFAULT_TOP_K_PILLS;
 let lastPageScoreResp: PageScoreResponse | null = null;
+let onboardingDismissed = false;
 
 // ---------------------------------------------------------------------------
 // Toast system
@@ -384,6 +386,13 @@ async function toggleCategory(id: string): Promise<void> {
   await chrome.storage.local.set({
     [STORAGE_KEYS.ACTIVE_CATEGORY_IDS]: activeIds,
   });
+
+  // Dismiss onboarding on first toggle
+  if (!onboardingDismissed) {
+    onboardingDismissed = true;
+    onboardingHint.style.display = "none";
+    chrome.storage.local.set({ [STORAGE_KEYS.ONBOARDING_DISMISSED]: true });
+  }
 
   buildCategoryGrid();
 }
@@ -1108,6 +1117,13 @@ async function init() {
   const savedIds = stored[STORAGE_KEYS.ACTIVE_CATEGORY_IDS] as string[] | undefined;
   if (savedIds && savedIds.length > 0) activeIds = savedIds;
   buildCategoryGrid();
+
+  // Onboarding hint
+  const dismissedFlag = await chrome.storage.local.get(STORAGE_KEYS.ONBOARDING_DISMISSED);
+  onboardingDismissed = dismissedFlag[STORAGE_KEYS.ONBOARDING_DISMISSED] === true;
+  if (!onboardingDismissed) {
+    onboardingHint.style.display = "";
+  }
 
   // Model source input
   const savedUrl = (stored[STORAGE_KEYS.CUSTOM_MODEL_URL] as string) || "";
