@@ -5,6 +5,8 @@ export interface VibeResult {
   status: string;
   emoji: string;
   colorHSL: string;
+  /** True if item matched a muted keyword and was filtered */
+  filtered?: boolean;
 }
 
 /** A user-provided training label (thumbs up/down) */
