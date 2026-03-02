@@ -64,10 +64,7 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 
 ### Install
 
-1. Download the latest `sift-*.zip` from [Releases](https://github.com/shreyaskarnik/Sift/releases)
-2. Unzip the file
-3. Open `chrome://extensions`, enable **Developer Mode**
-4. Click **Load unpacked** and select the `dist/` folder
+[**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/sift/nhghlogiaofciokjbigcdnidieckjjfj)
 
 ### Build from source
 
