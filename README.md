@@ -66,6 +66,8 @@ Supported sites today: **Hacker News, Reddit, X** (more coming).
 
 [**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/sift/nhghlogiaofciokjbigcdnidieckjjfj)
 
+Or build from source for the latest changes:
+
 ### Build from source
 
 ```bash
