@@ -1,0 +1,147 @@
+[
+  {
+    "scene": "intro",
+    "text": "Sift scores your feed with EmbeddingGemma, right in the browser. Version 0.2 brings the side panel, smart caching, and muted keywords."
+  },
+  {
+    "scene": "how-it-works",
+    "text": "Under the hood, Sift runs an embedding model locally using WebGPU and Transformers.js. Every post is compared against your chosen categories to produce a relevance score.",
+    "overlay": {
+      "type": "headline-card",
+      "title": "Local Embedding Model",
+      "body": "WebGPU + Transformers.js",
+      "placement": "bottom-right",
+      "motion": "slide-in"
+    }
+  },
+  {
+    "scene": "problem",
+    "text": "Hundreds of posts scroll by every day. Only a handful actually matter to you. Sift finds them."
+  },
+  {
+    "scene": "hn-before",
+    "text": "Here's Hacker News without Sift. An undifferentiated wall of links, no way to tell what's relevant at a glance.",
+    "overlay": {
+      "type": "callout",
+      "text": "No scoring — every post looks the same",
+      "placement": "top-right",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "hn-after",
+    "text": "With Sift enabled, low-relevance posts are dimmed, matching categories appear as pills, and the score inspector shows exactly why each post ranked the way it did.",
+    "overlay": {
+      "type": "headline-card",
+      "kicker": "After",
+      "title": "Scored & Filtered",
+      "body": "Low-relevance dimmed, categories visible, inspector active",
+      "placement": "top-left",
+      "motion": "slide-in"
+    }
+  },
+  {
+    "scene": "side-panel-intro",
+    "text": "The side panel is your persistent dashboard. It shows the page score, all 25 categories, muted keywords, and your taste profile."
+  },
+  {
+    "scene": "side-panel",
+    "text": "It stays open while you browse, updating in real time as you navigate between pages.",
+    "overlay": {
+      "type": "lower-third",
+      "text": "Side panel — always open while you browse",
+      "placement": "bottom-center",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "multi-site",
+    "text": "Sift works wherever you read. The same model and the same categories give you consistent scoring across every site."
+  },
+  {
+    "scene": "reddit",
+    "text": "Here it is on Reddit, scoring posts in r/LocalLLaMA.",
+    "overlay": {
+      "type": "callout",
+      "text": "Reddit — r/LocalLLaMA",
+      "placement": "top-left",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "x",
+    "text": "And on X, surfacing the signal in your timeline.",
+    "overlay": {
+      "type": "callout",
+      "text": "X — timeline scoring",
+      "placement": "top-right",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "techcrunch",
+    "text": "On article pages like TechCrunch, the side panel scores the full page content.",
+    "overlay": {
+      "type": "headline-card",
+      "title": "Article Scoring",
+      "body": "Full page content scored in the side panel",
+      "placement": "bottom-right",
+      "motion": "slide-in"
+    }
+  },
+  {
+    "scene": "muted",
+    "text": "Muted keywords let you block the noise. Items matching your keywords fade to near-invisible, and no model inference is wasted on them."
+  },
+  {
+    "scene": "caching",
+    "text": "Smart caching means if Sift has seen a post before, it skips the model entirely. An LRU cache for two thousand embeddings gives you instant re-scores on tab switches and infinite scroll."
+  },
+  {
+    "scene": "taste-intro",
+    "text": "After labeling ten or more items, Sift builds a contrastive taste profile of your interests."
+  },
+  {
+    "scene": "taste",
+    "text": "The radar chart and ranked probes show your top interests by affinity, giving you a clear picture of what Sift has learned about you.",
+    "overlay": {
+      "type": "lower-third",
+      "text": "Radar chart + ranked probes — your top interests by affinity",
+      "placement": "bottom-center",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "training",
+    "text": "The Label Manager lets you filter, edit, and reassign categories. It's your curation tool for building high-quality training data.",
+    "overlay": {
+      "type": "headline-card",
+      "kicker": "Workflow",
+      "title": "Label → Curate → Export → Fine-tune",
+      "placement": "bottom-center",
+      "motion": "slide-in"
+    }
+  },
+  {
+    "scene": "labels",
+    "text": "Filter by category, polarity, or source. Edit labels inline. Reassign categories with a click.",
+    "overlay": {
+      "type": "callout",
+      "text": "Filter · Edit · Reassign categories",
+      "placement": "top-right",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "loop",
+    "text": "The training loop ties it all together. Label items as you browse, curate in the Label Manager, export as CSV, fine-tune locally or in Colab, then load the model back into Sift."
+  },
+  {
+    "scene": "privacy",
+    "text": "Everything runs locally. No backend, no API costs, no data leaves your browser. Privacy first."
+  },
+  {
+    "scene": "outro",
+    "text": "Sift is open source under Apache 2.0. Check it out on GitHub."
+  }
+]

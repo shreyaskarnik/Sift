@@ -26,6 +26,10 @@ video-frames/
 .video-chrome-profile/
 .screenshot-chrome-profile/
 
+# Argo video pipeline
+.argo/
+videos/
+
 # Python build
 build/
 dist/
@@ -51,3 +55,4 @@ dist/
 
 # Private drafts
 linkedin-announcement.md
+test-results/
