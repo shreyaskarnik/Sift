@@ -60,7 +60,7 @@
   },
   {
     "scene": "reddit",
-    "text": "Here it is on Reddit, scoring posts in r/LocalLLaMA.",
+    "text": "Here it is on Reddit, scoring posts in r/Local Llama",
     "overlay": {
       "type": "callout",
       "text": "Reddit — r/LocalLLaMA",
@@ -134,7 +134,7 @@
   },
   {
     "scene": "loop",
-    "text": "The training loop ties it all together. Label items as you browse, curate in the Label Manager, export as CSV, fine-tune locally or in Colab, then load the model back into Sift."
+    "text": "The training loop ties it all together. Label items as you browse, curate in the Label Manager, export as CSV, fine-tune locally or in Collab, then load the model back into Sift."
   },
   {
     "scene": "privacy",
@@ -142,6 +142,14 @@
   },
   {
     "scene": "outro",
-    "text": "Sift is open source under Apache 2.0. Check it out on GitHub."
+    "text": "Sift is open source under Apache 2.0. Check it out on GitHub.",
+    "effects": [
+      {
+        "type": "confetti",
+        "spread": "burst",
+        "pieces": 150,
+        "duration": 3000
+      }
+    ]
   }
 ]

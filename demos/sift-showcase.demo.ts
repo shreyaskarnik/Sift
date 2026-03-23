@@ -1,21 +1,40 @@
-import { test } from '@argo-video/cli';
-import { showOverlay, withOverlay } from '@argo-video/cli';
-import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { test } from "@argo-video/cli";
+import { showOverlay, withOverlay, showConfetti } from "@argo-video/cli";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
-const ROOT = resolve(__dirname, '..');
-const SCREENSHOTS_DIR = join(ROOT, 'docs', 'assets', 'video-screenshots');
-const LOGO_PATH = join(ROOT, 'docs', 'assets', 'logo.png');
-const LOGO_DATA_URI = `data:image/png;base64,${readFileSync(LOGO_PATH).toString('base64')}`;
+const ROOT = resolve(__dirname, "..");
+const SCREENSHOTS_DIR = join(ROOT, "docs", "assets", "video-screenshots");
+const LOGO_PATH = join(ROOT, "docs", "assets", "logo.png");
+const LOGO_DATA_URI = `data:image/png;base64,${readFileSync(LOGO_PATH).toString("base64")}`;
 
 // ─── Category labels for word cloud background ─────────────────────────────
 const CATEGORY_LABELS = [
-  'News', 'AI Research', 'Startups', 'Deep Tech', 'Science',
-  'Programming', 'Open Source', 'Security & Privacy', 'Design & UX',
-  'Product & SaaS', 'Finance & Markets', 'Crypto & Web3', 'Politics',
-  'Legal & Policy', 'Climate & Energy', 'Space & Aerospace',
-  'Health & Biotech', 'Education', 'Gaming', 'Sports', 'Music',
-  'Culture & Arts', 'Food & Cooking', 'Travel', 'Parenting',
+  "News",
+  "AI Research",
+  "Startups",
+  "Deep Tech",
+  "Science",
+  "Programming",
+  "Open Source",
+  "Security & Privacy",
+  "Design & UX",
+  "Product & SaaS",
+  "Finance & Markets",
+  "Crypto & Web3",
+  "Politics",
+  "Legal & Policy",
+  "Climate & Energy",
+  "Space & Aerospace",
+  "Health & Biotech",
+  "Education",
+  "Gaming",
+  "Sports",
+  "Music",
+  "Culture & Arts",
+  "Food & Cooking",
+  "Travel",
+  "Parenting",
 ];
 
 function mulberry32(seed: number) {
@@ -38,7 +57,7 @@ function wordCloudHTML(): string {
     const rotate = (rng() - 0.5) * 12;
     return `<span style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;font-size:${size.toFixed(0)}px;opacity:${opacity.toFixed(2)};transform:rotate(${rotate.toFixed(1)}deg)">${label}</span>`;
   });
-  return `<div class="word-cloud">${spans.join('\n    ')}</div>`;
+  return `<div class="word-cloud">${spans.join("\n    ")}</div>`;
 }
 
 // ─── HTML builders (ported from generate-video.mjs) ────────────────────────
@@ -82,17 +101,17 @@ function titleCardHTML(
   </style>
 </head>
 <body>
-  ${opts.wordCloud ? wordCloudHTML() : ''}
-  ${opts.logo ? `<img class="logo" src="${LOGO_DATA_URI}" />` : ''}
+  ${opts.wordCloud ? wordCloudHTML() : ""}
+  ${opts.logo ? `<img class="logo" src="${LOGO_DATA_URI}" />` : ""}
   <div class="title">${title}</div>
-  ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ''}
-  ${opts.poweredBy ? `<div class="powered-by">Powered by EmbeddingGemma<span class="sep">&middot;</span>Transformers.js<span class="sep">&middot;</span>WebGPU<span class="sep">&middot;</span>Chrome Extensions</div>` : ''}
+  ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ""}
+  ${opts.poweredBy ? `<div class="powered-by">Powered by EmbeddingGemma<span class="sep">&middot;</span>Transformers.js<span class="sep">&middot;</span>WebGPU<span class="sep">&middot;</span>Chrome Extensions</div>` : ""}
 </body>
 </html>`;
 }
 
 function screenshotPageHTML(imagePath: string): string {
-  const imgData = `data:image/png;base64,${readFileSync(imagePath).toString('base64')}`;
+  const imgData = `data:image/png;base64,${readFileSync(imagePath).toString("base64")}`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -115,11 +134,16 @@ function screenshotPageHTML(imagePath: string): string {
 
 /** Title card — no overlay (the card IS the visual). */
 async function showTitle(
-  page: any, narration: any, scene: string,
-  title: string, subtitle?: string,
+  page: any,
+  narration: any,
+  scene: string,
+  title: string,
+  subtitle?: string,
   opts?: { logo?: boolean; poweredBy?: boolean; wordCloud?: boolean },
 ) {
-  await page.setContent(titleCardHTML(title, subtitle, opts), { waitUntil: 'networkidle' });
+  await page.setContent(titleCardHTML(title, subtitle, opts), {
+    waitUntil: "networkidle",
+  });
   await page.waitForTimeout(600);
   narration.mark(scene);
   await page.waitForTimeout(narration.durationFor(scene));
@@ -127,9 +151,14 @@ async function showTitle(
 
 /** Screenshot with overlay from scenes.json shown during recording. */
 async function showScreenshotWithOverlay(
-  page: any, narration: any, scene: string, filename: string,
+  page: any,
+  narration: any,
+  scene: string,
+  filename: string,
 ) {
-  await page.setContent(screenshotPageHTML(join(SCREENSHOTS_DIR, filename)), { waitUntil: 'load' });
+  await page.setContent(screenshotPageHTML(join(SCREENSHOTS_DIR, filename)), {
+    waitUntil: "load",
+  });
   await page.waitForTimeout(400);
   narration.mark(scene);
   // showOverlay reads config from scenes.json for this scene name
@@ -138,9 +167,14 @@ async function showScreenshotWithOverlay(
 
 /** Screenshot without overlay — just mark and hold. */
 async function showScreenshot(
-  page: any, narration: any, scene: string, filename: string,
+  page: any,
+  narration: any,
+  scene: string,
+  filename: string,
 ) {
-  await page.setContent(screenshotPageHTML(join(SCREENSHOTS_DIR, filename)), { waitUntil: 'load' });
+  await page.setContent(screenshotPageHTML(join(SCREENSHOTS_DIR, filename)), {
+    waitUntil: "load",
+  });
   await page.waitForTimeout(400);
   narration.mark(scene);
   await page.waitForTimeout(narration.durationFor(scene));
@@ -148,92 +182,143 @@ async function showScreenshot(
 
 // ─── Demo ───────────────────────────────────────────────────────────────────
 
-test('sift-showcase', async ({ page, narration }) => {
+test("sift-showcase", async ({ page, narration }) => {
   test.setTimeout(300_000);
 
   // ── Intro (title card, no overlay needed) ──
-  await showTitle(page, narration, 'intro',
+  await showTitle(
+    page,
+    narration,
+    "intro",
     '<span class="accent">Sift</span>',
-    'Score your feed with EmbeddingGemma<br>v0.2 — side panel, smart caching, muted keywords.',
+    "Score your feed with EmbeddingGemma<br>v0.2 — side panel, smart caching, muted keywords.",
     { logo: true, poweredBy: true },
   );
 
   // ── How it works (animated diagram + headline-card overlay) ──
-  const diagramPath = join(SCREENSHOTS_DIR, 'embedding-diagram-dark.html');
-  await page.goto(`file://${diagramPath}`, { waitUntil: 'networkidle' });
+  const diagramPath = join(SCREENSHOTS_DIR, "embedding-diagram-dark.html");
+  await page.goto(`file://${diagramPath}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(800);
-  narration.mark('how-it-works');
-  await showOverlay(page, 'how-it-works', narration.durationFor('how-it-works'));
+  narration.mark("how-it-works");
+  await showOverlay(
+    page,
+    "how-it-works",
+    narration.durationFor("how-it-works"),
+  );
 
   // ── Problem statement (title card) ──
-  await showTitle(page, narration, 'problem',
-    'Hundreds of posts. Only a few matter to you.',
+  await showTitle(
+    page,
+    narration,
+    "problem",
+    "Hundreds of posts. Only a few matter to you.",
     '<span class="accent">Sift</span> finds them.',
   );
 
   // ── Before / After (screenshots with overlays) ──
-  await showScreenshotWithOverlay(page, narration, 'hn-before', 'hn-before.png');
-  await showScreenshotWithOverlay(page, narration, 'hn-after', 'hn-after.png');
+  await showScreenshotWithOverlay(
+    page,
+    narration,
+    "hn-before",
+    "hn-before.png",
+  );
+  await showScreenshotWithOverlay(page, narration, "hn-after", "hn-after.png");
 
   // ── Side Panel intro (title card with word cloud) ──
-  await showTitle(page, narration, 'side-panel-intro',
-    'The Side Panel',
-    'Persistent dashboard — page score, 25 categories, muted keywords, taste profile.',
+  await showTitle(
+    page,
+    narration,
+    "side-panel-intro",
+    "The Side Panel",
+    "Persistent dashboard — page score, 25 categories, muted keywords, taste profile.",
     { wordCloud: true },
   );
 
   // ── Side Panel screenshot (lower-third overlay) ──
-  await showScreenshotWithOverlay(page, narration, 'side-panel', 'side-panel.png');
+  await showScreenshotWithOverlay(
+    page,
+    narration,
+    "side-panel",
+    "side-panel.png",
+  );
 
   // ── Multi-site (title card) ──
-  await showTitle(page, narration, 'multi-site',
-    'Works Wherever You Read',
-    'Same model, same categories — consistent scoring on any page.',
+  await showTitle(
+    page,
+    narration,
+    "multi-site",
+    "Works Wherever You Read",
+    "Same model, same categories — consistent scoring on any page.",
   );
 
   // ── Site screenshots (callout / headline overlays) ──
-  await showScreenshotWithOverlay(page, narration, 'reddit', 'reddit.png');
-  await showScreenshotWithOverlay(page, narration, 'x', 'x.png');
-  await showScreenshotWithOverlay(page, narration, 'techcrunch', 'techcrunch.png');
+  await showScreenshotWithOverlay(page, narration, "reddit", "reddit.png");
+  await showScreenshotWithOverlay(page, narration, "x", "x.png");
+  await showScreenshotWithOverlay(
+    page,
+    narration,
+    "techcrunch",
+    "techcrunch.png",
+  );
 
   // ── Muted Keywords (title card) ──
-  await showTitle(page, narration, 'muted',
-    'Muted Keywords',
-    'Block the noise. Items matching your keywords fade to near-invisible — no model inference wasted.',
+  await showTitle(
+    page,
+    narration,
+    "muted",
+    "Muted Keywords",
+    "Block the noise. Items matching your keywords fade to near-invisible — no model inference wasted.",
   );
 
   // ── Caching (title card) ──
-  await showTitle(page, narration, 'caching',
-    'Smart Caching',
-    'Seen it before? Skip the model.<br>LRU cache for 2,000 embeddings — instant re-scores on tab switches and infinite scroll.',
+  await showTitle(
+    page,
+    narration,
+    "caching",
+    "Smart Caching",
+    "Seen it before? Skip the model.<br>LRU cache for 2,000 embeddings — instant re-scores on tab switches and infinite scroll.",
   );
 
   // ── Taste Profile intro (title card) ──
-  await showTitle(page, narration, 'taste-intro',
-    'Taste Profile',
-    'After labeling 10+ items, Sift builds a contrastive profile of your interests.',
+  await showTitle(
+    page,
+    narration,
+    "taste-intro",
+    "Taste Profile",
+    "After labeling 10+ items, Sift builds a contrastive profile of your interests.",
   );
 
   // ── Taste screenshot (lower-third overlay) ──
-  await showScreenshotWithOverlay(page, narration, 'taste', 'taste.png');
+  await showScreenshotWithOverlay(page, narration, "taste", "taste.png");
 
   // ── Training (title card + headline-card overlay via withOverlay) ──
-  await page.setContent(titleCardHTML(
-    'Curate &amp; Train',
-    'Label Manager for filtering, editing, and category reassignment. Then fine-tune.',
-  ), { waitUntil: 'networkidle' });
+  await page.setContent(
+    titleCardHTML(
+      "Curate &amp; Train",
+      "Label Manager for filtering, editing, and category reassignment. Then fine-tune.",
+    ),
+    { waitUntil: "networkidle" },
+  );
   await page.waitForTimeout(600);
-  narration.mark('training');
-  await withOverlay(page, 'training', async () => {
-    await page.waitForTimeout(narration.durationFor('training'));
+  narration.mark("training");
+  await withOverlay(page, "training", async () => {
+    await page.waitForTimeout(narration.durationFor("training"));
   });
 
   // ── Label Manager screenshot (callout overlay) ──
-  await showScreenshotWithOverlay(page, narration, 'labels', 'label-manager.png');
+  await showScreenshotWithOverlay(
+    page,
+    narration,
+    "labels",
+    "label-manager.png",
+  );
 
   // ── Training loop (title card) ──
-  await showTitle(page, narration, 'loop',
-    'The Training Loop',
+  await showTitle(
+    page,
+    narration,
+    "loop",
+    "The Training Loop",
     `<div style="text-align:left; max-width:600px; margin:0 auto;">
       <div style="margin:6px 0;">1. Label items as you browse</div>
       <div style="margin:6px 0;">2. Curate in the Label Manager</div>
@@ -244,13 +329,19 @@ test('sift-showcase', async ({ page, narration }) => {
   );
 
   // ── Privacy (title card) ──
-  await showTitle(page, narration, 'privacy',
-    'Privacy-First',
-    'No backend. No API costs. Inference stays local.',
+  await showTitle(
+    page,
+    narration,
+    "privacy",
+    "Privacy-First",
+    "No backend. No API costs. Inference stays local.",
   );
 
   // ── Outro (title card) ──
-  await showTitle(page, narration, 'outro',
+  await showTitle(
+    page,
+    narration,
+    "outro",
     '<span class="accent">Sift</span>',
     `Open source · Apache-2.0<br><br>
     <span style="font-family: JetBrains Mono, monospace; font-size: 16px; color: #4e5058;">
@@ -258,4 +349,9 @@ test('sift-showcase', async ({ page, narration }) => {
     </span>`,
     { logo: true },
   );
+  showConfetti(page, {
+    spread: "burst",
+    duration: 3200,
+    pieces: 200,
+  });
 });
